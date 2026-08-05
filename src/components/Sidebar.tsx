@@ -127,10 +127,8 @@ export function Sidebar() {
       roles: ["SUPER_ADMIN"],
       items: [
         { href: "/admin/users",           label: "👥 Users",             module: MODULES.ADMIN_USERS },
-        { href: "/admin/permissions",      label: "🔐 Permission Matrix", module: MODULES.ADMIN_PERMISSIONS },
         { href: "/admin/audit-logs",       label: "📋 Audit Logs",        module: MODULES.ADMIN_AUDIT_LOGS },
-        { href: "/admin/settings",         label: "⚙️ Programs & Depts",  module: MODULES.ADMIN_SETTINGS },
-        { href: "/admin/settings/fees",    label: "💰 Fee Settings",       module: MODULES.ADMIN_SETTINGS },
+        { href: "/admin/settings",         label: "⚙️ System Settings",    module: MODULES.ADMIN_SETTINGS },
       ],
     },
   ];
