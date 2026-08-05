@@ -1,0 +1,12 @@
+-- AlterTable
+ALTER TABLE "Admission" ADD COLUMN "gender" TEXT;
+ALTER TABLE "Admission" ADD COLUMN "hsscBoard" TEXT DEFAULT 'BBISE QUETTA';
+ALTER TABLE "Admission" ADD COLUMN "hsscGroup" TEXT;
+ALTER TABLE "Admission" ADD COLUMN "hsscObtained" INTEGER;
+ALTER TABLE "Admission" ADD COLUMN "hsscTotal" INTEGER;
+ALTER TABLE "Admission" ADD COLUMN "hsscYear" INTEGER;
+ALTER TABLE "Admission" ADD COLUMN "sscBoard" TEXT DEFAULT 'BBISE QUETTA';
+ALTER TABLE "Admission" ADD COLUMN "sscGroup" TEXT;
+ALTER TABLE "Admission" ADD COLUMN "sscObtained" INTEGER;
+ALTER TABLE "Admission" ADD COLUMN "sscTotal" INTEGER;
+ALTER TABLE "Admission" ADD COLUMN "sscYear" INTEGER;

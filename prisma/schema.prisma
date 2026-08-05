@@ -1,0 +1,508 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// ROLES (string values used in application):
+//   SUPER_ADMIN, BS_CONTROLLER, BS_FACULTY,
+//   INTER_FACULTY, PRINCIPAL, STUDENT
+// ─────────────────────────────────────────────
+
+// ─────────────────────────────────────────────
+// ACTIONS (for permissions):
+//   VIEW, ADD, EDIT, DELETE, GENERATE,
+//   PRINT, DOWNLOAD, EXPORT, APPROVE, LOCK
+// ─────────────────────────────────────────────
+
+// ─────────────────────────────────────────────
+// MODULES (for permissions):
+//   INTERMEDIATE.ADMISSIONS, INTERMEDIATE.STUDENTS,
+//   INTERMEDIATE.FEES, INTERMEDIATE.ATTENDANCE,
+//   INTERMEDIATE.TIMETABLE, INTERMEDIATE.FACULTY,
+//   INTERMEDIATE.REPORTS,
+//   BS.ADMISSIONS, BS.ACADEMIC_SETUP, BS.STUDENTS,
+//   BS.COURSES, BS.ENROLLMENTS, BS.FEES,
+//   BS.ATTENDANCE, BS.TIMETABLE, BS.EXAMS,
+//   BS.MARKS, BS.RESULTS, BS.GPA_CGPA,
+//   BS.PROMOTIONS, BS.DMC, BS.TRANSCRIPT,
+//   BS.GAZETTE, BS.STUDENT_ACTIONS, BS.GRADUATION,
+//   ADMIN.USERS, ADMIN.PERMISSIONS, ADMIN.AUDIT_LOGS,
+//   ADMIN.SETTINGS
+// ─────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("STUDENT")
+  // Roles: SUPER_ADMIN | BS_CONTROLLER | BS_FACULTY | INTER_FACULTY | PRINCIPAL | STUDENT
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  student   Student?
+  faculty   Faculty?
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  module      String           // e.g. "BS.MARKS"
+  action      String           // e.g. "EDIT"
+  description String?
+  rolePerms   RolePermission[]
+  
+  @@unique([module, action])
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  role         String     // e.g. "BS_FACULTY" or "GUEST"
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  isGranted    Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  
+  @@unique([role, permissionId])
+}
+
+model Department {
+  id        String    @id @default(uuid())
+  name      String
+  code      String    @unique
+  hodName   String?
+  isActive  Boolean   @default(true)
+  programs  Program[]
+  faculty   Faculty[]
+  courses   Course[]
+  timetables Timetable[]
+  datesheets Datesheet[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Faculty {
+  id              String         @id @default(uuid())
+  userId          String         @unique
+  user            User           @relation(fields: [userId], references: [id])
+  departmentId    String?
+  department      Department?    @relation(fields: [departmentId], references: [id])
+  educationLevel  String?        // "INTERMEDIATE" | "BS" | null (both)
+  isActive        Boolean        @default(true)
+  courses         Course[]
+  timetables      Timetable[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+
+model Program {
+  id              String         @id @default(uuid())
+  name            String         // e.g., F.Sc, F.A, BS Computer Science
+  code            String?        @unique
+  educationLevel  String         // "INTERMEDIATE" or "BS"
+  isActive        Boolean        @default(true)
+  departmentId    String?
+  department      Department?    @relation(fields: [departmentId], references: [id])
+  groups          Group[]
+  courses         Course[]
+  timetables      Timetable[]
+  datesheets      Datesheet[]
+  students        Student[]
+  admissions      Admission[]
+  challans        Challan[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Group {
+  id              String         @id @default(uuid())
+  name            String         // e.g., Pre-Engineering, Pre-Medical, FA Special
+  programId       String
+  program         Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  subjects        Subject[]
+  students        Student[]
+  admissions      Admission[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Subject {
+  id              String         @id @default(uuid())
+  name            String         // e.g., Physics, Chemistry
+  code            String?
+  groupId         String?
+  group           Group?         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+// BSAdmissionType: REGULAR | BRIDGING_5TH
+// EducationLevel:  INTERMEDIATE | BS
+
+model Student {
+  id              String         @id @default(uuid())
+  userId          String         @unique
+  user            User           @relation(fields: [userId], references: [id])
+  rollNumber      String         @unique
+  educationLevel  String         // "INTERMEDIATE" or "BS"
+  session         String?        // Academic batch year e.g. "2023"
+  
+  // Personal details (copied from approved Admission)
+  fatherName      String?
+  cnic            String?
+  contactNumber   String?
+  
+  // Intermediate specific
+  programId       String?
+  program         Program?       @relation(fields: [programId], references: [id])
+  groupId         String?
+  group           Group?         @relation(fields: [groupId], references: [id])
+  
+  // BS specific
+  bsAdmissionType String?        // "REGULAR" or "BRIDGING_5TH"
+  currentSemester Int?
+  
+  fees            Fee[]
+  challans        Challan[]
+  attendances     Attendance[]
+  enrollments     Enrollment[]
+  marks           Marks[]
+  results         Result[]
+  statuses        StudentStatus[]
+  promotions      Promotion[]
+  isActive        Boolean        @default(true)
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model StudentStatus {
+  id          String   @id @default(uuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  statusType  String   // FREEZE | QUIT | MIGRATION | GRADUATION | ACTIVE
+  reason      String?
+  fromDate    DateTime?
+  toDate      DateTime?
+  approvedBy  String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Promotion {
+  id              String   @id @default(uuid())
+  studentId       String
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fromSemester    Int
+  toSemester      Int
+  status          String   // PROMOTED | PROBATION | REPEATED | DROPOUT
+  gpa             Float?
+  cgpa            Float?
+  promotedBy      String?
+  promotedAt      DateTime @default(now())
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Admission {
+  id              String         @id @default(uuid())
+  studentName     String
+  fatherName      String
+  cnic            String         @unique
+  dateOfBirth     DateTime
+  contactNumber   String
+  email           String         @unique
+  educationLevel  String         // "INTERMEDIATE" or "BS"
+  
+  // Intermediate specific
+  programId       String?
+  program         Program?       @relation(fields: [programId], references: [id])
+  groupId         String?
+  group           Group?         @relation(fields: [groupId], references: [id])
+  
+  // BS specific
+  bsAdmissionType    String?     // "REGULAR", "BRIDGING_5TH", or "MIGRATION"
+  migrationSemester  Int?        // Semester number for migration (1-8)
+  session            String?     // Academic session year e.g. "2026"
+  
+  status          String         @default("PENDING") // PENDING, APPROVED, REJECTED
+  
+  gender          String?        // "MALE" | "FEMALE"
+  
+  // Previous Qualifications
+  sscGroup        String?        // "SCIENCE" | "HUMANITIES"
+  sscObtained     Int?
+  sscTotal        Int?
+  sscYear         Int?
+  sscBoard        String?        @default("BBISE QUETTA")
+  
+  hsscGroup       String?        // "PRE_MEDICAL" | "PRE_ENGINEERING" | "HUMANITIES" | "ICS" | "COMMERCE"
+  hsscObtained    Int?
+  hsscTotal       Int?
+  hsscYear        Int?
+  hsscBoard       String?        @default("BBISE QUETTA")
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  challans        Challan[]
+}
+
+// ─── Challan (fee payment slips — works for applicants & registered students) ──
+model Challan {
+  id             String    @id @default(uuid())
+  challanNumber  String    @unique
+  cnic           String                // Links to Admission.cnic or Student.cnic
+  applicantName  String
+  fatherName     String?
+  feeType        String                // key from FeeSettings e.g. "BS_ADMISSION"
+  feeLabel       String                // e.g. "BS Admission Fee"
+  amount         Float
+  dueDate        DateTime
+  status         String    @default("PENDING") // PENDING | PAID | REJECTED
+  particulars    String?               // Custom note on challan
+  educationLevel String?               // "BS" | "INTERMEDIATE"
+  semester       Int?
+  session        String?
+  paidAt         DateTime?
+  paidId         String?   @unique  // e.g. PAID-20260805-A3X9K — generated on payment approval
+  remarks        String?
+  gender         String?   // "MALE" | "FEMALE"
+  programId      String?
+  program        Program?  @relation(fields: [programId], references: [id])
+
+  // Optional links (null until admission approved / student registered)
+  admissionId    String?
+  admission      Admission? @relation(fields: [admissionId], references: [id])
+  studentId      String?
+  student        Student?   @relation(fields: [studentId], references: [id])
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Fee Settings (configurable fee amounts) ─────────────────────────────────
+model FeeSettings {
+  id          String   @id @default(uuid())
+  key         String   @unique  // e.g. "BS_ADMISSION", "BS_SEMESTER", "INTER_ADMISSION"
+  label       String            // Display name e.g. "BS Admission Fee"
+  amount      Float             // Fee amount in PKR
+  isLocked    Boolean  @default(false) // If true, amount cannot be changed
+  description String?           // Optional note
+  category    String?           // "BS" | "INTERMEDIATE" | "EXAM" | "OTHER"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Fee {
+  id              String         @id @default(uuid())
+  studentId       String
+  student         Student        @relation(fields: [studentId], references: [id])
+  amount          Float
+  dueDate         DateTime
+  status          String         @default("UNPAID") // UNPAID, PAID, WAIVED
+  challanNumber   String         @unique
+  feeType         String?        // TUITION, EXAM, LIBRARY, etc.
+  semester        Int?
+  educationLevel  String?        // "INTERMEDIATE" or "BS"
+  paidAt          DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model ClassSection {
+  id              String         @id @default(uuid())
+  name            String         // e.g. "A", "B", "Pre-Med 1"
+  programId       String
+  groupId         String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Timetable {
+  id              String         @id @default(uuid())
+  session         String         @default("2022")
+  semester        Int?
+  dayOfWeek       String         
+  startTime       String
+  endTime         String
+  educationLevel  String?        // "INTERMEDIATE" | "BS"
+  
+  generationMode  String         @default("MANUAL") // AUTO, MANUAL
+  status          String         @default("PUBLISHED") // DRAFT, PUBLISHED, ARCHIVED
+  
+  courseId        String?
+  course          Course?        @relation(fields: [courseId], references: [id])
+  facultyId       String?
+  faculty         Faculty?       @relation(fields: [facultyId], references: [id])
+  programId       String?
+  program         Program?       @relation(fields: [programId], references: [id])
+  departmentId    String?
+  department      Department?    @relation(fields: [departmentId], references: [id])
+  
+  classSectionId  String?        // Intermediate
+  subjectId       String?        // Intermediate
+
+  datesheets      Datesheet[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Attendance {
+  id              String         @id @default(uuid())
+  studentId       String
+  student         Student        @relation(fields: [studentId], references: [id])
+  date            DateTime
+  status          String         // PRESENT, ABSENT, LEAVE
+  classSectionId  String?        // For Intermediate
+  courseId        String?        // For BS
+  course          Course?        @relation(fields: [courseId], references: [id])
+  educationLevel  String?        // "INTERMEDIATE" | "BS"
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Course {
+  id              String         @id @default(uuid())
+  title           String
+  code            String
+  creditHours     Int
+  courseType      String         @default("THEORY") // THEORY, PRACTICAL
+  session         String         @default("2022")
+  semester        Int
+  programId       String
+  program         Program        @relation(fields: [programId], references: [id])
+  departmentId    String?
+  department      Department?    @relation(fields: [departmentId], references: [id])
+  facultyId       String?
+  faculty         Faculty?       @relation(fields: [facultyId], references: [id])
+  
+  isActive        Boolean        @default(true)
+  
+  enrollments     Enrollment[]
+  marks           Marks[]
+  timetables      Timetable[]
+  datesheets      Datesheet[]
+  attendances     Attendance[]
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Enrollment {
+  id              String         @id @default(uuid())
+  studentId       String
+  student         Student        @relation(fields: [studentId], references: [id])
+  courseId        String
+  semester        Int
+  course          Course         @relation(fields: [courseId], references: [id])
+  status          String         @default("ACTIVE") // ACTIVE, DROPPED, REPEATED
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  
+  @@unique([studentId, courseId])
+}
+
+model Exam {
+  id              String         @id @default(uuid())
+  title           String         // e.g. "Midterm Fall 2026"
+  type            String         // MIDTERM, FINAL
+  semester        Int
+  session         String?
+  programId       String?
+  isLocked        Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Datesheet {
+  id              String         @id @default(uuid())
+  session         String         @default("2022")
+  semester        Int?
+  examType        String         @default("FINAL_TERM")
+  examSession     String?
+  date            DateTime
+  startTime       String
+  endTime         String
+  
+  generationMode  String         @default("MANUAL")
+  status          String         @default("PUBLISHED")
+  
+  timetableId     String?
+  timetable       Timetable?     @relation(fields: [timetableId], references: [id])
+  courseId        String?
+  course          Course?        @relation(fields: [courseId], references: [id])
+  programId       String?
+  program         Program?       @relation(fields: [programId], references: [id])
+  departmentId    String?
+  department      Department?    @relation(fields: [departmentId], references: [id])
+  
+  examId          String?
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Marks {
+  id              String         @id @default(uuid())
+  studentId       String
+  student         Student        @relation(fields: [studentId], references: [id])
+  courseId        String
+  examId          String?
+  course          Course         @relation(fields: [courseId], references: [id])
+  
+  assignmentMarks Float?         @default(0)
+  quizMarks       Float?         @default(0)
+  midtermMarks    Float?         @default(0)
+  finalMarks      Float?         @default(0)
+  obtainedMarks   Float          @default(0)
+  totalMarks      Float          @default(100)
+  isLocked        Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  
+  @@unique([studentId, courseId])
+}
+
+model Result {
+  id              String         @id @default(uuid())
+  studentId       String
+  student         Student        @relation(fields: [studentId], references: [id])
+  semester        Int
+  gpa             Float?
+  cgpa            Float?
+  status          String         // PROMOTED, PROBATION, DROPOUT, REPEATED
+  isLocked        Boolean        @default(false)
+  lockedBy        String?
+  lockedAt        DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model AuditLog {
+  id              String         @id @default(uuid())
+  userId          String?
+  userEmail       String?
+  userName        String?
+  action          String         // CREATE, UPDATE, DELETE, LOGIN, PUBLISH, LOCK, APPROVE
+  entity          String         // Student, Timetable, Admission, Marks, Result, etc.
+  entityId        String?
+  description     String
+  ipAddress       String?
+  createdAt       DateTime       @default(now())
+}
