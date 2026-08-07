@@ -100,6 +100,7 @@ export default function PrintChallanPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 print:p-0 print:bg-white flex flex-col items-center">
+      <style>{`@media print { @page { size: landscape; margin: 5mm; } }`}</style>
       {/* Control bar */}
       <div className="mb-6 print:hidden w-full max-w-7xl bg-white p-4 rounded-xl shadow-md border flex justify-between items-center">
         <div>
@@ -139,7 +140,10 @@ export default function PrintChallanPage() {
               </div>
 
               <div className="text-center bg-gray-50 py-1 border rounded text-[7px] font-semibold text-gray-600 uppercase tracking-wide">
-                Account No: {settings.CHALLAN_BANK_ACCOUNT || "08730001324203"}<br/>Habib Bank Limited (HBL)
+                Bank: {settings.CHALLAN_BANK_NAME || "Habib Bank Limited (HBL)"}<br/>
+                Branch Code: {settings.CHALLAN_BRANCH_CODE || "0873"}<br/>
+                Title: {settings.CHALLAN_ACCOUNT_TITLE || "Principal Govt College"}<br/>
+                A/C No: {settings.CHALLAN_BANK_ACCOUNT || "08730001324203"}
               </div>
 
               {/* Barcode/QR mockup */}

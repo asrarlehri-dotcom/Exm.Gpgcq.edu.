@@ -23,12 +23,21 @@ type Program = {
   groups: Group[];
 };
 
+type CustomField = {
+  id: string;
+  label: string;
+  type: string;
+  required: boolean;
+};
+
 type FeeSetting = {
   id: string;
   key: string;
+  session?: string | null;
   label: string;
   amount: number;
   isLocked: boolean;
+  isActive: boolean;
   description: string | null;
   category: string | null;
 };
@@ -142,11 +151,44 @@ export default function UnifiedSettingsPage() {
   const [editDesc, setEditDesc] = useState("");
   const [savingFee, setSavingFee] = useState(false);
 
+  // New states for session overrides
+  const [newOverrideKey, setNewOverrideKey] = useState("");
+  const [newOverrideSession, setNewOverrideSession] = useState("");
+  const [newOverrideAmount, setNewOverrideAmount] = useState("");
+  const [newOverrideDesc, setNewOverrideDesc] = useState("");
+  const [creatingOverride, setCreatingOverride] = useState(false);
+
+  // States for custom base fee item creation
+  const [newBaseKey, setNewBaseKey] = useState("");
+  const [newBaseLabel, setNewBaseLabel] = useState("");
+  const [newBaseCategory, setNewBaseCategory] = useState("BS");
+  const [newBaseAmount, setNewBaseAmount] = useState("");
+  const [newBaseDesc, setNewBaseDesc] = useState("");
+  const [creatingBase, setCreatingBase] = useState(false);
+
+  // States for base fee inline editing
+  const [editKey, setEditKey] = useState("");
+  const [editLabel, setEditLabel] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+
   // Global settings state
   const [bankAccount, setBankAccount] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [branchCode, setBranchCode] = useState("");
+  const [accountTitle, setAccountTitle] = useState("");
+  const [isLocked, setIsLocked] = useState(true);
   const [sequenceStart, setSequenceStart] = useState("");
   const [rollPattern, setRollPattern] = useState("");
   const [rollSequence, setRollSequence] = useState("");
+  const [academicSessions, setAcademicSessions] = useState<string[]>([]);
+  const [newSessionInput, setNewSessionInput] = useState("");
+  
+  // Admission Form Settings
+  const [admissionRequiredFields, setAdmissionRequiredFields] = useState<string[]>([]);
+  const [admissionCnicLength, setAdmissionCnicLength] = useState("15");
+  const [admissionContactLength, setAdmissionContactLength] = useState("11");
+  const [admissionCustomFields, setAdmissionCustomFields] = useState<CustomField[]>([]);
+
   const [updatingSettings, setUpdatingSettings] = useState(false);
 
   const fetchSettings = async () => {
@@ -154,16 +196,43 @@ export default function UnifiedSettingsPage() {
     if (res.ok) {
       const data = await res.json();
       setBankAccount(data.CHALLAN_BANK_ACCOUNT || "");
+      setBankName(data.CHALLAN_BANK_NAME || "");
+      setBranchCode(data.CHALLAN_BRANCH_CODE || "");
+      setAccountTitle(data.CHALLAN_ACCOUNT_TITLE || "");
       setSequenceStart(data.CHALLAN_SEQUENCE_CURRENT || "");
       setRollPattern(data.ROLL_NUMBER_PATTERN || "");
       setRollSequence(data.ROLL_SEQUENCE_CURRENT || "");
+      if (data.ACADEMIC_SESSIONS) {
+        setAcademicSessions(data.ACADEMIC_SESSIONS.split(",").map((s: string) => s.trim()).filter(Boolean));
+      }
+      if (data.ADMISSION_REQUIRED_FIELDS) {
+        setAdmissionRequiredFields(data.ADMISSION_REQUIRED_FIELDS.split(",").map((s: string) => s.trim()).filter(Boolean));
+      } else {
+        setAdmissionRequiredFields(["studentName", "fatherName", "cnic", "dateOfBirth", "contactNumber", "email"]);
+      }
+      setAdmissionCnicLength(data.ADMISSION_CNIC_LENGTH || "15");
+      setAdmissionContactLength(data.ADMISSION_CONTACT_LENGTH || "11");
+      if (data.ADMISSION_CUSTOM_FIELDS) {
+        try {
+          setAdmissionCustomFields(JSON.parse(data.ADMISSION_CUSTOM_FIELDS));
+        } catch (e) {
+          console.error("Error parsing custom fields", e);
+        }
+      }
     }
   };
 
   const fetchFees = async () => {
     setFeesLoading(true);
     const res = await fetch("/api/fee-settings");
-    if (res.ok) setFees(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      setFees(data);
+      const baseFees = data.filter((f: any) => !f.session || f.session === "");
+      if (baseFees.length > 0) {
+        setNewOverrideKey(prev => prev || baseFees[0].key);
+      }
+    }
     setFeesLoading(false);
   };
 
@@ -177,7 +246,12 @@ export default function UnifiedSettingsPage() {
         CHALLAN_BANK_ACCOUNT: bankAccount,
         CHALLAN_SEQUENCE_CURRENT: sequenceStart,
         ROLL_NUMBER_PATTERN: rollPattern,
-        ROLL_SEQUENCE_CURRENT: rollSequence
+        ROLL_SEQUENCE_CURRENT: rollSequence,
+        ACADEMIC_SESSIONS: academicSessions.join(","),
+        ADMISSION_REQUIRED_FIELDS: admissionRequiredFields.join(","),
+        ADMISSION_CNIC_LENGTH: admissionCnicLength,
+        ADMISSION_CONTACT_LENGTH: admissionContactLength,
+        ADMISSION_CUSTOM_FIELDS: JSON.stringify(admissionCustomFields)
       }),
     });
     if (res.ok) {
@@ -193,6 +267,9 @@ export default function UnifiedSettingsPage() {
     setEditingFeeId(fee.id);
     setEditAmount(String(fee.amount));
     setEditDesc(fee.description || "");
+    setEditKey(fee.key);
+    setEditLabel(fee.label);
+    setEditCategory(fee.category || "OTHER");
   };
 
   const handleSaveFee = async (id: string) => {
@@ -206,13 +283,21 @@ export default function UnifiedSettingsPage() {
     const res = await fetch(`/api/fee-settings`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, amount: amountVal, description: editDesc }),
+      body: JSON.stringify({
+        id,
+        amount: amountVal,
+        description: editDesc,
+        key: editKey,
+        label: editLabel,
+        category: editCategory
+      }),
     });
     if (res.ok) {
       setEditingFeeId(null);
       fetchFees();
     } else {
-      alert("Failed to update fee setting.");
+      const err = await res.json();
+      alert(err.error || "Failed to update fee setting.");
     }
     setSavingFee(false);
   };
@@ -226,6 +311,119 @@ export default function UnifiedSettingsPage() {
     });
     if (res.ok) {
       fetchFees();
+    }
+  };
+
+  const handleAddOverride = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOverrideKey || !newOverrideSession || !newOverrideAmount) return;
+    setCreatingOverride(true);
+    const amountVal = parseFloat(newOverrideAmount);
+    if (isNaN(amountVal)) {
+      alert("Please enter a valid amount.");
+      setCreatingOverride(false);
+      return;
+    }
+    
+    // Find the base fee label and category to duplicate
+    const baseFee = fees.find(f => f.key === newOverrideKey && (!f.session || f.session === ""));
+    const label = baseFee ? `${baseFee.label} (Session ${newOverrideSession})` : undefined;
+    const category = baseFee ? baseFee.category : undefined;
+
+    const res = await fetch("/api/fee-settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        key: newOverrideKey,
+        session: newOverrideSession,
+        amount: amountVal,
+        label,
+        category,
+        description: newOverrideDesc || undefined
+      }),
+    });
+
+    if (res.ok) {
+      setNewOverrideSession("");
+      setNewOverrideAmount("");
+      setNewOverrideDesc("");
+      fetchFees();
+    } else {
+      const err = await res.json();
+      alert(err.error || "Failed to create override.");
+    }
+    setCreatingOverride(false);
+  };
+
+  const handleDeleteOverride = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this session override?")) return;
+    const res = await fetch(`/api/fee-settings?id=${id}`, {
+      method: "DELETE"
+    });
+    if (res.ok) {
+      fetchFees();
+    } else {
+      alert("Failed to delete override.");
+    }
+  };
+
+  const handleToggleActive = async (fee: FeeSetting) => {
+    const res = await fetch(`/api/fee-settings`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: fee.id, isActive: !fee.isActive }),
+    });
+    if (res.ok) {
+      fetchFees();
+    } else {
+      alert("Failed to toggle fee status.");
+    }
+  };
+
+  const handleAddBaseFee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBaseKey || !newBaseLabel || !newBaseAmount) return;
+    setCreatingBase(true);
+    const amountVal = parseFloat(newBaseAmount);
+    if (isNaN(amountVal)) {
+      alert("Please enter a valid amount.");
+      setCreatingBase(false);
+      return;
+    }
+    const res = await fetch("/api/fee-settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        key: newBaseKey.toUpperCase().trim(),
+        label: newBaseLabel.trim(),
+        category: newBaseCategory,
+        amount: amountVal,
+        description: newBaseDesc.trim() || undefined
+      }),
+    });
+    if (res.ok) {
+      setNewBaseKey("");
+      setNewBaseLabel("");
+      setNewBaseAmount("");
+      setNewBaseDesc("");
+      fetchFees();
+    } else {
+      const err = await res.json();
+      alert(err.error || "Failed to create base fee.");
+    }
+    setCreatingBase(false);
+  };
+
+  const handleDeleteBaseFee = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this fee item? All overrides associated with this fee will remain but the base key will be removed.")) return;
+    const res = await fetch(`/api/fee-settings?id=${id}`, {
+      method: "DELETE"
+    });
+    if (res.ok) {
+      fetchFees();
+    } else {
+      const err = await res.json();
+      alert(err.error || "Failed to delete fee item.");
     }
   };
 
@@ -605,7 +803,7 @@ export default function UnifiedSettingsPage() {
                     onChange={(e) => setRollPattern(e.target.value)}
                   />
                   <p className="text-[10px] text-gray-400 mt-1">
-                    Placeholders: <span className="font-bold font-mono">[YEAR]</span> (session year), <span className="font-bold font-mono">[CODE]</span> (program code), <span className="font-bold font-mono">[SEQ]</span> (sequential sequence).
+                    Placeholders: <span className="font-bold font-mono">[YEAR]</span> (session year), <span className="font-bold font-mono">[CODE]</span> (program code), <span className="font-bold font-mono">[SEQ]</span> (sequential sequence), <span className="font-bold font-mono">[TYPE]</span> (empty, -Bridge, or -Migration).
                   </p>
                 </div>
                 <div>
@@ -619,8 +817,150 @@ export default function UnifiedSettingsPage() {
                   />
                 </div>
               </div>
+              {/* Academic Sessions tags list */}
+              <div className="pt-4 border-t mt-2">
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Registered Academic Sessions</label>
+                
+                {/* Active sessions list */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {academicSessions.map((session) => (
+                    <span
+                      key={session}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold rounded-lg shadow-sm"
+                    >
+                      📅 {session}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAcademicSessions(prev => prev.filter(s => s !== session));
+                        }}
+                        className="text-blue-500 hover:text-blue-700 font-bold ml-1"
+                        title="Remove session"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {academicSessions.length === 0 && (
+                    <p className="text-gray-400 text-xs italic">No custom sessions added yet. Defaults will be loaded.</p>
+                  )}
+                </div>
 
-              <div className="pt-2 flex justify-end">
+                {/* Add new session input */}
+                <div className="flex gap-2 max-w-sm">
+                  <input
+                    type="text"
+                    placeholder="e.g. 2026-2030 or 2024"
+                    className="flex-1 px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-400 outline-none text-xs"
+                    value={newSessionInput}
+                    onChange={(e) => setNewSessionInput(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const clean = newSessionInput.trim();
+                      if (clean && !academicSessions.includes(clean)) {
+                        setAcademicSessions(prev => [...prev, clean]);
+                        setNewSessionInput("");
+                      }
+                    }}
+                    className="px-4 py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+                  >
+                    Add Session
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-6 border-t mt-4 space-y-4">
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">📝 Admission Form Validation Settings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">CNIC Length Limit</label>
+                    <input
+                      type="number"
+                      required
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
+                      value={admissionCnicLength}
+                      onChange={(e) => setAdmissionCnicLength(e.target.value)}
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Default is 15 for hyphenated (12345-1234567-1). Set to 13 to strictly disallow hyphens.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Contact No Length Limit</label>
+                    <input
+                      type="number"
+                      required
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
+                      value={admissionContactLength}
+                      onChange={(e) => setAdmissionContactLength(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Compulsory Fields</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {["studentName", "fatherName", "cnic", "dateOfBirth", "contactNumber", "email", "residentAddress", "gender"].map(field => (
+                      <label key={field} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer p-2 border rounded-lg hover:bg-gray-50">
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          checked={admissionRequiredFields.includes(field)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setAdmissionRequiredFields(prev => [...prev, field]);
+                            } else {
+                              setAdmissionRequiredFields(prev => prev.filter(f => f !== field));
+                            }
+                          }}
+                        />
+                        <span className="capitalize">{field.replace(/([A-Z])/g, ' $1').replace('cnic', 'CNIC')}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Custom Dynamic Fields */}
+                <div className="pt-2">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Custom Dynamic Fields (Add/Remove)</label>
+                  <div className="space-y-2 mb-3">
+                    {admissionCustomFields.map((cf) => (
+                      <div key={cf.id} className="flex items-center gap-2 p-2 border rounded-lg bg-gray-50 text-sm">
+                        <span className="font-semibold flex-1">{cf.label}</span>
+                        <span className="text-gray-500 uppercase text-xs">{cf.type}</span>
+                        <span className={`text-xs font-bold ${cf.required ? 'text-red-500' : 'text-gray-400'}`}>{cf.required ? "Required" : "Optional"}</span>
+                        <button type="button" onClick={() => setAdmissionCustomFields(prev => prev.filter(f => f.id !== cf.id))} className="text-red-500 hover:text-red-700 ml-2">❌</button>
+                      </div>
+                    ))}
+                    {admissionCustomFields.length === 0 && <p className="text-xs text-gray-400 italic">No custom fields added.</p>}
+                  </div>
+                  <div className="flex flex-wrap gap-2 items-center bg-white p-2 border rounded-lg">
+                    <input type="text" placeholder="Field Label (e.g. Blood Group)" id="new_cf_label" className="flex-1 min-w-[120px] px-2 py-1.5 text-sm border rounded focus:ring-blue-500 outline-none" />
+                    <select id="new_cf_type" className="px-2 py-1.5 text-sm border rounded focus:ring-blue-500 outline-none bg-white">
+                      <option value="text">Text</option>
+                      <option value="number">Number</option>
+                      <option value="date">Date</option>
+                    </select>
+                    <label className="flex items-center gap-1 text-xs font-bold text-gray-600"><input type="checkbox" id="new_cf_req" className="rounded" /> Required</label>
+                    <button type="button" onClick={() => {
+                      const labelEl = document.getElementById("new_cf_label") as HTMLInputElement;
+                      const typeEl = document.getElementById("new_cf_type") as HTMLSelectElement;
+                      const reqEl = document.getElementById("new_cf_req") as HTMLInputElement;
+                      if (!labelEl.value.trim()) return;
+                      const newField = {
+                        id: "cf_" + Date.now(),
+                        label: labelEl.value.trim(),
+                        type: typeEl.value,
+                        required: reqEl.checked
+                      };
+                      setAdmissionCustomFields(prev => [...prev, newField]);
+                      labelEl.value = "";
+                      reqEl.checked = false;
+                    }} className="px-3 py-1.5 bg-gray-900 text-white rounded text-xs font-bold hover:bg-black transition-colors">Add Field</button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 flex justify-end">
                 <button
                   type="submit"
                   disabled={updatingSettings}
@@ -632,125 +972,407 @@ export default function UnifiedSettingsPage() {
             </form>
           </div>
 
-          {/* Fee Amounts Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b flex justify-between items-center flex-wrap gap-4">
-              <div>
-                <h2 className="text-lg font-bold text-gray-900">💰 Fee Rates & Locks</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Configure and lock fee amounts used for auto challan generation.</p>
-              </div>
-              <div className="flex gap-2 text-xs">
-                <span className="px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded font-semibold">🔓 Editable</span>
-                <span className="px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded font-semibold">🔒 Locked (Fixed)</span>
-              </div>
+          {/* Grid layout for custom base fee creation and base fees table */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            
+            {/* Create Base Fee Form */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit space-y-4 lg:col-span-1">
+              <h2 className="text-base font-bold text-gray-900 border-b pb-2">➕ Add New Fee Item</h2>
+              <form onSubmit={handleAddBaseFee} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Fee Key (Unique)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. SPORTS_FEE"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
+                    value={newBaseKey}
+                    onChange={(e) => setNewBaseKey(e.target.value.toUpperCase().replace(/\s+/g, "_"))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Display Label</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Sports & Athletics Fee"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    value={newBaseLabel}
+                    onChange={(e) => setNewBaseLabel(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Category</label>
+                  <select
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+                    value={newBaseCategory}
+                    onChange={(e) => setNewBaseCategory(e.target.value)}
+                  >
+                    <option value="BS">BS Program</option>
+                    <option value="INTERMEDIATE">Intermediate Program</option>
+                    <option value="EXAM">Examination</option>
+                    <option value="OTHER">Other Fees</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Amount (PKR)</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="e.g. 1500"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
+                    value={newBaseAmount}
+                    onChange={(e) => setNewBaseAmount(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Description (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="Brief description"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    value={newBaseDesc}
+                    onChange={(e) => setNewBaseDesc(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={creatingBase}
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+                >
+                  {creatingBase ? "Creating Item..." : "Save Fee Item"}
+                </button>
+              </form>
             </div>
 
-            {feesLoading ? (
-              <p className="p-6 text-center text-gray-400 text-sm">Loading fee settings...</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-gray-50 border-b">
-                    <tr>
-                      <th className="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap w-24">Lock Status</th>
-                      <th className="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Fee Category</th>
-                      <th className="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Fee Label</th>
-                      <th className="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Amount (PKR)</th>
-                      <th className="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Amount in Words</th>
-                      <th className="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {fees.map((fee) => {
-                      const isEditing = editingFeeId === fee.id;
-                      return (
-                        <tr key={fee.id} className="border-b hover:bg-gray-50/50">
-                          <td className="px-6 py-4">
-                            <span className={`px-2 py-0.5 text-xs rounded-full font-bold ${
-                              fee.isLocked ? "bg-red-50 text-red-700 border border-red-100" : "bg-green-50 text-green-700 border border-green-100"
-                            }`}>
-                              {fee.isLocked ? "🔒 Locked" : "🔓 Open"}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 font-semibold text-gray-500 uppercase tracking-wide text-xs">{fee.category || "General"}</td>
-                          <td className="px-6 py-4">
-                            <div className="font-semibold text-gray-900">{fee.label}</div>
-                            {isEditing ? (
-                              <input
-                                type="text"
-                                className="mt-1 w-full px-2 py-1 border rounded text-xs"
-                                value={editDesc}
-                                onChange={(e) => setEditDesc(e.target.value)}
-                                placeholder="Note/Description"
-                              />
-                            ) : (
-                              fee.description && <div className="text-xs text-gray-500">{fee.description}</div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 font-mono font-bold text-gray-800">
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                className="w-24 px-2 py-1 border rounded text-sm font-bold font-mono focus:ring-blue-500"
-                                value={editAmount}
-                                onChange={(e) => setEditAmount(e.target.value)}
-                              />
-                            ) : (
-                              `Rs. ${fee.amount.toLocaleString()}`
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-xs text-gray-500 capitalize italic">
-                            {isEditing ? (
-                              toWords(parseFloat(editAmount) || 0) + " Rupees Only"
-                            ) : (
-                              toWords(fee.amount) + " Rupees Only"
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <div className="flex justify-center gap-3">
-                              {fee.isLocked ? (
-                                <span className="text-xs text-gray-400">Fixed</span>
-                              ) : isEditing ? (
-                                <>
-                                  <button
-                                    onClick={() => handleSaveFee(fee.id)}
-                                    disabled={savingFee}
-                                    className="text-xs text-blue-600 font-bold hover:underline"
-                                  >
-                                    Save
-                                  </button>
-                                  <button
-                                    onClick={() => setEditingFeeId(null)}
-                                    className="text-xs text-gray-500 hover:underline"
-                                  >
-                                    Cancel
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => startEditFee(fee)}
-                                    className="text-xs text-blue-600 hover:underline"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleLockFee(fee.id)}
-                                    className="text-xs text-red-600 hover:underline font-semibold"
-                                  >
-                                    Lock Value
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+            {/* Fee Amounts Card (Base Fees Table) */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden lg:col-span-3">
+              <div className="p-6 border-b flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">💰 Base Fee Rates & Locks</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">Configure default fee amounts used for auto challan generation when no session override exists.</p>
+                </div>
+                <div className="flex gap-2 text-xs">
+                  <span className="px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded font-semibold">🔓 Editable</span>
+                  <span className="px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded font-semibold">🔒 Locked (Fixed)</span>
+                </div>
               </div>
-            )}
+
+              {feesLoading ? (
+                <p className="p-6 text-center text-gray-400 text-sm">Loading fee settings...</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap w-24">Lock Status</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap w-24">Status</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Category</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Key</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Fee Label</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Amount (PKR)</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Amount in Words</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fees.filter(f => !f.session || f.session === "").map((fee) => {
+                        const isEditing = editingFeeId === fee.id;
+                        return (
+                          <tr key={fee.id} className="border-b hover:bg-gray-50/50">
+                            <td className="px-4 py-4">
+                              <span className={`px-2 py-0.5 text-xs rounded-full font-bold ${
+                                fee.isLocked ? "bg-red-50 text-red-700 border border-red-100" : "bg-green-50 text-green-700 border border-green-100"
+                              }`}>
+                                {fee.isLocked ? "🔒 Locked" : "🔓 Open"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4">
+                              <button
+                                onClick={() => handleToggleActive(fee)}
+                                className={`px-2.5 py-1 text-xs rounded-lg font-bold border transition-colors ${
+                                  fee.isActive
+                                    ? "bg-green-600 border-green-600 text-white hover:bg-green-700"
+                                    : "bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200"
+                                }`}
+                              >
+                                {fee.isActive ? "🟢 Active" : "🔴 Inactive"}
+                              </button>
+                            </td>
+                            <td className="px-4 py-4">
+                              {isEditing ? (
+                                <select
+                                  className="px-2 py-1 border rounded text-xs bg-white focus:ring-blue-500"
+                                  value={editCategory}
+                                  onChange={(e) => setEditCategory(e.target.value)}
+                                >
+                                  <option value="BS">BS</option>
+                                  <option value="INTERMEDIATE">INTERMEDIATE</option>
+                                  <option value="EXAM">EXAM</option>
+                                  <option value="OTHER">OTHER</option>
+                                </select>
+                              ) : (
+                                <span className="font-semibold text-gray-500 uppercase tracking-wide text-xs">{fee.category || "General"}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4 font-mono text-xs font-bold text-gray-700">
+                              {isEditing && !fee.isLocked ? (
+                                <input
+                                  type="text"
+                                  className="px-2 py-1 border rounded text-xs font-bold font-mono focus:ring-blue-500"
+                                  value={editKey}
+                                  onChange={(e) => setEditKey(e.target.value.toUpperCase())}
+                                />
+                              ) : (
+                                fee.key
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              {isEditing && !fee.isLocked ? (
+                                <input
+                                  type="text"
+                                  className="w-full px-2 py-1 border rounded text-xs focus:ring-blue-500"
+                                  value={editLabel}
+                                  onChange={(e) => setEditLabel(e.target.value)}
+                                />
+                              ) : (
+                                <div className="font-semibold text-gray-900">{fee.label}</div>
+                              )}
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  className="mt-1 w-full px-2 py-1 border rounded text-[10px] text-gray-500"
+                                  value={editDesc}
+                                  onChange={(e) => setEditDesc(e.target.value)}
+                                  placeholder="Note/Description"
+                                />
+                              ) : (
+                                fee.description && <div className="text-xs text-gray-500">{fee.description}</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-4 font-mono font-bold text-gray-800">
+                              {isEditing ? (
+                                <input
+                                  type="number"
+                                  className="w-24 px-2 py-1 border rounded text-sm font-bold font-mono focus:ring-blue-500"
+                                  value={editAmount}
+                                  onChange={(e) => setEditAmount(e.target.value)}
+                                />
+                              ) : (
+                                `Rs. ${fee.amount.toLocaleString()}`
+                              )}
+                            </td>
+                            <td className="px-4 py-4 text-xs text-gray-500 capitalize italic">
+                              {isEditing ? (
+                                toWords(parseFloat(editAmount) || 0) + " Rupees Only"
+                              ) : (
+                                toWords(fee.amount) + " Rupees Only"
+                              )}
+                            </td>
+                            <td className="px-4 py-4 text-center">
+                              <div className="flex justify-center gap-3">
+                                {isEditing ? (
+                                  <>
+                                    <button
+                                      onClick={() => handleSaveFee(fee.id)}
+                                      disabled={savingFee}
+                                      className="text-xs text-blue-600 font-bold hover:underline"
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingFeeId(null)}
+                                      className="text-xs text-gray-500 hover:underline"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => startEditFee(fee)}
+                                      className="text-xs text-blue-600 hover:underline"
+                                    >
+                                      Edit
+                                    </button>
+                                    {!fee.isLocked && (
+                                      <>
+                                        <button
+                                          onClick={() => handleLockFee(fee.id)}
+                                          className="text-xs text-red-600 hover:underline font-semibold"
+                                        >
+                                          Lock
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteBaseFee(fee.id)}
+                                          className="text-xs text-red-600 hover:underline font-semibold"
+                                        >
+                                          Delete
+                                        </button>
+                                      </>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          {/* Session Overrides Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Create Override Form */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit space-y-4 lg:col-span-1">
+              <h2 className="text-base font-bold text-gray-900 border-b pb-2">➕ Add Session Override</h2>
+              <form onSubmit={handleAddOverride} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Select Fee Item</label>
+                  <select
+                    required
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+                    value={newOverrideKey}
+                    onChange={(e) => setNewOverrideKey(e.target.value)}
+                  >
+                    {fees.filter(f => (!f.session || f.session === "") && f.isActive).map(f => (
+                      <option key={f.key} value={f.key}>{f.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Session Year</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="e.g. 2022"
+                    min={2000}
+                    max={2099}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
+                    value={newOverrideSession}
+                    onChange={(e) => setNewOverrideSession(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Override Amount (PKR)</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="e.g. 3000"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
+                    value={newOverrideAmount}
+                    onChange={(e) => setNewOverrideAmount(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Description (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Discounted rate for 2022 batch"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    value={newOverrideDesc}
+                    onChange={(e) => setNewOverrideDesc(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={creatingOverride}
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+                >
+                  {creatingOverride ? "Creating Override..." : "Save Override"}
+                </button>
+              </form>
+            </div>
+
+            {/* List of Active Overrides */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden lg:col-span-2">
+              <div className="p-6 border-b">
+                <h2 className="text-base font-bold text-gray-900">⚡ Active Session Overrides</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Session-wise customized fee structures currently active in the system.</p>
+              </div>
+
+              {feesLoading ? (
+                <p className="p-6 text-center text-gray-400 text-xs">Loading overrides...</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="px-4 py-2.5 font-semibold text-gray-600">Session</th>
+                        <th className="px-4 py-2.5 font-semibold text-gray-600">Fee Item</th>
+                        <th className="px-4 py-2.5 font-semibold text-gray-600">Override Amount</th>
+                        <th className="px-4 py-2.5 font-semibold text-gray-600">Description</th>
+                        <th className="px-4 py-2.5 font-semibold text-gray-600 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fees.filter(f => f.session && f.session !== "").map((fee) => {
+                        const isEditing = editingFeeId === fee.id;
+                        return (
+                          <tr key={fee.id} className="border-b hover:bg-gray-50/50">
+                            <td className="px-4 py-3 font-mono font-bold text-blue-700">{fee.session}</td>
+                            <td className="px-4 py-3 font-semibold text-gray-900">
+                              {fees.find(bf => bf.key === fee.key && (!bf.session || bf.session === ""))?.label || fee.key}
+                            </td>
+                            <td className="px-4 py-3 font-mono font-bold text-gray-800">
+                              {isEditing ? (
+                                <input
+                                  type="number"
+                                  className="w-20 px-2 py-0.5 border rounded text-xs font-bold font-mono"
+                                  value={editAmount}
+                                  onChange={(e) => setEditAmount(e.target.value)}
+                                />
+                              ) : (
+                                `Rs. ${fee.amount.toLocaleString()}`
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-gray-500">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  className="w-full px-2 py-0.5 border rounded text-xs"
+                                  value={editDesc}
+                                  onChange={(e) => setEditDesc(e.target.value)}
+                                />
+                              ) : (
+                                fee.description || "—"
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <div className="flex justify-center gap-2">
+                                {isEditing ? (
+                                  <>
+                                    <button onClick={() => handleSaveFee(fee.id)} className="text-blue-600 font-bold hover:underline">Save</button>
+                                    <button onClick={() => setEditingFeeId(null)} className="text-gray-500 hover:underline">Cancel</button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button onClick={() => startEditFee(fee)} className="text-blue-600 hover:underline">Edit</button>
+                                    <button onClick={() => handleDeleteOverride(fee.id)} className="text-red-600 font-bold hover:underline">Delete</button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {fees.filter(f => f.session && f.session !== "").length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="p-8 text-center text-gray-400 italic">No session-wise overrides configured. Use the form on the left to add one!</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
       )}

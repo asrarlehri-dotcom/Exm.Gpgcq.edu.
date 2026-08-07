@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { generateRollNumber } from "@/app/shared-actions";
 
 export async function POST(request: Request) {
   try {
@@ -42,25 +43,71 @@ export async function POST(request: Request) {
       // 1. Create User account for student
       const user = await tx.user.create({
         data: {
-          email: admission.email,
+          email: admission.email || `${admission.studentName.replace(/\s+/g, "").toLowerCase()}_${Date.now().toString().slice(-4)}@cms.local`,
           name: admission.studentName,
           password: "password123", // default password
           role: "STUDENT",
         }
       });
 
+      // Get the program first since generateRollNumber needs it
+      const admissionWithProgram = await tx.admission.findUnique({
+        where: { id: admission.id },
+        include: { program: true }
+      });
+      const rollNumber = await generateRollNumber(tx, admissionWithProgram || admission);
+
       // 2. Create Student profile
       const student = await tx.student.create({
         data: {
           userId: user.id,
-          rollNumber: `ROLL-${Math.floor(Math.random() * 10000)}`,
+          rollNumber,
           educationLevel: admission.educationLevel,
           programId: admission.programId,
           groupId: admission.groupId,
           bsAdmissionType: admission.bsAdmissionType,
-          currentSemester: admission.educationLevel === "BS" ? 1 : null,
+          session: admission.session,
+          currentSemester: admission.educationLevel === "BS" 
+            ? (admission.bsAdmissionType === "BRIDGING_5TH" ? 5 : (admission.bsAdmissionType === "MIGRATION" ? (admission.migrationSemester || 1) : 1))
+            : null,
+          bscGroup: admission.bscGroup,
+          bscObtained: admission.bscObtained,
+          bscTotal: admission.bscTotal,
+          bscYear: admission.bscYear,
+          bscBoard: admission.bscBoard,
         }
       });
+
+      // 2.5 If Migrated Student, insert previous semesters marks to DB
+      if (admission.bsAdmissionType === "MIGRATION" && admission.previousMarksJson) {
+        try {
+          const list = JSON.parse(admission.previousMarksJson);
+          for (const item of list) {
+            await tx.marks.upsert({
+              where: {
+                studentId_courseId: {
+                  studentId: student.id,
+                  courseId: item.courseId
+                }
+              },
+              update: {
+                obtainedMarks: Number(item.obtainedMarks),
+                totalMarks: Number(item.totalMarks),
+                isLocked: true
+              },
+              create: {
+                studentId: student.id,
+                courseId: item.courseId,
+                obtainedMarks: Number(item.obtainedMarks),
+                totalMarks: Number(item.totalMarks),
+                isLocked: true
+              }
+            });
+          }
+        } catch (err) {
+          console.error("Error writing migration previous marks:", err);
+        }
+      }
 
       // 3. Generate initial admission fee challan
       const feeAmount = admission.educationLevel === "BS" ? 50000 : 25000;

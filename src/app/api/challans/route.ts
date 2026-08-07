@@ -58,10 +58,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Lookup fee amount from FeeSettings
-    const feeSetting = await prisma.feeSettings.findUnique({ where: { key: feeType } });
+    // Lookup fee amount from FeeSettings (checking most recent session override <= target session)
+    let feeSetting = null;
+    const sessionNum = Number(session);
+    if (session && !isNaN(sessionNum)) {
+      const overrides = await prisma.feeSettings.findMany({
+        where: {
+          key: feeType,
+          NOT: [{ session: null }, { session: "" }]
+        }
+      });
+      const validOverrides = overrides
+        .filter(o => o.session && !isNaN(Number(o.session)) && Number(o.session) <= sessionNum)
+        .sort((a, b) => Number(b.session) - Number(a.session));
+      if (validOverrides.length > 0) {
+        feeSetting = validOverrides[0];
+      }
+    }
     if (!feeSetting) {
-      return NextResponse.json({ error: "Invalid fee type" }, { status: 400 });
+      feeSetting = await prisma.feeSettings.findFirst({
+        where: { key: feeType, OR: [{ session: null }, { session: "" }] }
+      });
+    }
+    if (!feeSetting || !feeSetting.isActive) {
+      return NextResponse.json({ error: "This fee item is currently inactive/deactivated." }, { status: 400 });
     }
 
     // ── Get and Increment Challan Sequence ──

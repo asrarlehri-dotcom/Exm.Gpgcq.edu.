@@ -2,14 +2,24 @@
 
 import { useState, useEffect } from "react";
 
-type FeeSetting = { id: string; key: string; label: string; amount: number; category: string | null };
+type FeeSetting = {
+  id: string;
+  key: string;
+  session?: string | null;
+  label: string;
+  amount: number;
+  isActive?: boolean;
+  category: string | null;
+};
 type Challan    = {
   id: string; challanNumber: string; applicantName: string; fatherName: string | null;
-  cnic: string; feeLabel: string; amount: number; dueDate: string; status: string;
+  cnic: string; feeType: string; feeLabel: string; amount: number; dueDate: string; status: string;
   educationLevel: string | null; semester: number | null; session: string | null;
   particulars: string | null; paidAt: string | null; paidId: string | null; createdAt: string;
   gender?: string | null;
+  programId?: string | null;
   program?: { name: string; code: string | null } | null;
+  student?: { id: string; rollNumber: string } | null;
 };
 
 type Program = { id: string; name: string; code: string | null };
@@ -38,6 +48,13 @@ export default function BsFeesPage() {
   const [filter, setFilter]     = useState("ALL");
   const [loading, setLoading]   = useState(true);
   const [msg, setMsg]           = useState({ type: "", text: "" });
+
+  // Advanced Filtering States
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterSession, setFilterSession] = useState("ALL");
+  const [filterProgram, setFilterProgram] = useState("ALL");
+  const [filterSemester, setFilterSemester] = useState("ALL");
+  const [filterCategory, setFilterCategory] = useState("ALL");
 
   // Generate form state
   const [cnic, setCnic]           = useState("");
@@ -137,9 +154,54 @@ export default function BsFeesPage() {
     }
   };
 
-  const filtered = filter === "ALL" ? challans : challans.filter(c => c.status === filter);
-  const bsFeeTypes = feeTypes.filter(f => f.category === "BS" || f.category === "OTHER");
-  const selectedFee = feeTypes.find(f => f.key === feeType);
+  const uniqueSessions = Array.from(
+    new Set(
+      challans
+        .map(c => c.session)
+        .filter((s): s is string => !!s)
+    )
+  ).sort((a, b) => b.localeCompare(a));
+
+  const filtered = challans.filter(c => {
+    if (filter !== "ALL" && c.status !== filter) return false;
+    if (filterSession !== "ALL" && c.session !== filterSession) return false;
+    if (filterProgram !== "ALL" && c.programId !== filterProgram) return false;
+    if (filterSemester !== "ALL" && String(c.semester) !== filterSemester) return false;
+    if (filterCategory !== "ALL") {
+      const isAdmission = c.feeType === "BS_ADMISSION" || c.feeType === "INTER_ADMISSION" || c.feeLabel.toLowerCase().includes("admission");
+      const isSemester = c.feeType === "BS_SEMESTER" || c.feeType === "INTER_SEMESTER" || c.feeLabel.toLowerCase().includes("semester");
+      const isExam = c.feeType === "BS_EXAM" || c.feeType === "INTER_EXAM" || c.feeLabel.toLowerCase().includes("exam");
+      if (filterCategory === "ADMISSION" && !isAdmission) return false;
+      if (filterCategory === "SEMESTER" && !isSemester) return false;
+      if (filterCategory === "EXAM" && !isExam) return false;
+      if (filterCategory === "OTHER" && (isAdmission || isSemester || isExam)) return false;
+    }
+    if (searchQuery.trim() !== "") {
+      const query = searchQuery.toLowerCase().trim();
+      const nameMatch = c.applicantName.toLowerCase().includes(query);
+      const cnicMatch = c.cnic.toLowerCase().includes(query);
+      const challanMatch = c.challanNumber.toLowerCase().includes(query);
+      const rollMatch = c.student?.rollNumber?.toLowerCase().includes(query);
+      if (!nameMatch && !cnicMatch && !challanMatch && !rollMatch) return false;
+    }
+    return true;
+  });
+  const bsFeeTypes = feeTypes.filter(f => (f.category === "BS" || f.category === "OTHER") && (!f.session || f.session === "") && f.isActive);
+  
+  const getDisplayAmount = (fee: any) => {
+    if (!fee) return 0;
+    const sessionNum = Number(session);
+    if (session && !isNaN(sessionNum)) {
+      const overrides = feeTypes.filter(f => f.key === fee.key && f.session && !isNaN(Number(f.session)));
+      const validOverrides = overrides
+        .filter(o => Number(o.session) <= sessionNum)
+        .sort((a, b) => Number(b.session) - Number(a.session));
+      if (validOverrides.length > 0) return validOverrides[0].amount;
+    }
+    return fee.amount;
+  };
+
+  const selectedFee = feeTypes.find(f => f.key === feeType && (!f.session || f.session === ""));
 
   return (
     <div className="space-y-6">
@@ -170,15 +232,117 @@ export default function BsFeesPage() {
       {/* ── CHALLANS LIST ────────────────────────────── */}
       {tab === "list" && (
         <>
-          {/* Filter bar */}
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex gap-3 flex-wrap items-center">
-            {["ALL", "PENDING", "PAID", "REJECTED"].map(s => (
-              <button key={s} onClick={() => setFilter(s)}
-                className={`px-4 py-2 text-sm rounded-lg font-medium transition-colors ${filter === s ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-                {s}
-              </button>
-            ))}
-            <span className="ml-auto text-sm text-gray-400">{filtered.length} / {challans.length}</span>
+          {/* Advanced Filter and Search Bar */}
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 space-y-4">
+            
+            {/* Search Box & Status filter row */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              {/* Status button group */}
+              <div className="flex gap-2 flex-wrap">
+                {["ALL", "PENDING", "PAID", "REJECTED"].map(s => (
+                  <button key={s} onClick={() => setFilter(s)}
+                    className={`px-4 py-2 text-sm rounded-lg font-medium transition-colors border ${
+                      filter === s ? "bg-blue-600 text-white border-blue-600 font-bold" : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                    }`}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search box input */}
+              <div className="relative w-full md:w-80">
+                <input
+                  type="text"
+                  placeholder="🔍 Search Name, Roll No, CNIC, Challan..."
+                  className="w-full pl-4 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400 outline-none text-sm"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Select Dropdowns Filters Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Session</label>
+                <select
+                  value={filterSession}
+                  onChange={(e) => setFilterSession(e.target.value)}
+                  className="w-full px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-400 text-xs bg-white"
+                >
+                  <option value="ALL">All Sessions</option>
+                  {uniqueSessions.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Program</label>
+                <select
+                  value={filterProgram}
+                  onChange={(e) => setFilterProgram(e.target.value)}
+                  className="w-full px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-400 text-xs bg-white"
+                >
+                  <option value="ALL">All Programs</option>
+                  {programs.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Semester</label>
+                <select
+                  value={filterSemester}
+                  onChange={(e) => setFilterSemester(e.target.value)}
+                  className="w-full px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-400 text-xs bg-white"
+                >
+                  <option value="ALL">All Semesters</option>
+                  {[1,2,3,4,5,6,7,8].map(s => (
+                    <option key={s} value={String(s)}>Semester {s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Challan Type</label>
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="w-full px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-400 text-xs bg-white"
+                >
+                  <option value="ALL">All Types</option>
+                  <option value="ADMISSION">Admission Challans</option>
+                  <option value="SEMESTER">Semester Challans</option>
+                  <option value="EXAM">Exam Challans</option>
+                  <option value="OTHER">Other Challans</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Count Indicator */}
+            <div className="flex justify-between items-center text-xs text-gray-400 pt-1 font-medium">
+              <div>
+                {(searchQuery || filterSession !== "ALL" || filterProgram !== "ALL" || filterSemester !== "ALL" || filterCategory !== "ALL") && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setFilterSession("ALL");
+                      setFilterProgram("ALL");
+                      setFilterSemester("ALL");
+                      setFilterCategory("ALL");
+                    }}
+                    className="text-blue-600 hover:underline"
+                  >
+                    Clear All Filters
+                  </button>
+                )}
+              </div>
+              <div>
+                Showing {filtered.length} of {challans.length} challans
+              </div>
+            </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -347,7 +511,7 @@ export default function BsFeesPage() {
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400 outline-none text-sm bg-white">
                   <option value="">-- Select Fee Type --</option>
                   {bsFeeTypes.map(f => (
-                    <option key={f.key} value={f.key}>{f.label} — Rs. {f.amount.toLocaleString()}</option>
+                    <option key={f.key} value={f.key}>{f.label} — Rs. {getDisplayAmount(f).toLocaleString()}</option>
                   ))}
                 </select>
               </div>
@@ -425,8 +589,8 @@ export default function BsFeesPage() {
             {selectedFee && !generated && (
               <div className="mt-4 p-4 bg-gray-50 rounded-xl border text-sm space-y-1">
                 <p className="font-semibold text-gray-700">{selectedFee.label}</p>
-                <p className="text-2xl font-black text-blue-700">Rs. {selectedFee.amount.toLocaleString()}/-</p>
-                <p className="text-xs text-gray-400 italic">({toWords(selectedFee.amount)} rupees only)</p>
+                <p className="text-2xl font-black text-blue-700">Rs. {getDisplayAmount(selectedFee).toLocaleString()}/-</p>
+                <p className="text-xs text-gray-400 italic">({toWords(getDisplayAmount(selectedFee))} rupees only)</p>
               </div>
             )}
           </div>

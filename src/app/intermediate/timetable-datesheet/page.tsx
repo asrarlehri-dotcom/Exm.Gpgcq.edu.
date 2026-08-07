@@ -7,10 +7,8 @@ import {
   generateTimetable,
   publishTimetable,
   deleteTimetableEntry,
-
+  getDatesheets,
 } from "../../bs/timetable-datesheet/actions";
-
-const SESSION_YEARS = ["2022", "2023", "2024", "2025", "2026", "2027"];
 
 const SELECT_CLS =
   "px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white";
@@ -24,6 +22,7 @@ export default function InterTimetableDatesheetPage() {
   const [allPrograms, setAllPrograms] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [faculties, setFaculties] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<string[]>([]);
 
   // ── TIMETABLE filters (Level is fixed to INTERMEDIATE)
   const [tSession, setTSession] = useState("2026");
@@ -32,7 +31,12 @@ export default function InterTimetableDatesheetPage() {
   const [timetables, setTimetables] = useState<any[]>([]);
 
   // ── DATESHEET filters
-
+  const [dSession, setDSession] = useState("2026");
+  const [dProgramId, setDProgramId] = useState("");
+  const [dDepartmentId, setDDepartmentId] = useState("");
+  const [dSemester, setDSemester] = useState("1");
+  const [dExamType, setDExamType] = useState("FINAL_TERM");
+  const [datesheets, setDatesheets] = useState<any[]>([]);
 
   // ── DUTY LIST State
   const [duties, setDuties] = useState<any[]>([]);
@@ -49,6 +53,17 @@ export default function InterTimetableDatesheetPage() {
         setDProgramId(interProgs[0].id);
       }
     });
+
+    fetch("/api/settings")
+      .then(res => res.json())
+      .then(data => {
+        if (data.ACADEMIC_SESSIONS) {
+          setSessions(data.ACADEMIC_SESSIONS.split(",").map((s: string) => s.trim()).filter(Boolean));
+        } else {
+          setSessions(["2022", "2023", "2024", "2025", "2026", "2027"]);
+        }
+      })
+      .catch(() => setSessions(["2022", "2023", "2024", "2025", "2026", "2027"]));
   }, []);
 
   // Fetch timetables
@@ -91,12 +106,32 @@ export default function InterTimetableDatesheetPage() {
     await loadTimetable();
   };
 
+  // Fetch Datesheets
+  const loadDatesheet = async () => {
+    setLoading(true);
+    const data = await getDatesheets(
+      dSession || undefined,
+      dProgramId || undefined,
+      dSemester ? parseInt(dSemester) : undefined,
+      dExamType || undefined,
+      dDepartmentId || undefined
+    );
+    const filtered = data.filter((d: any) => d.program?.educationLevel === "INTERMEDIATE");
+    setDatesheets(filtered);
 
+    // Mock duty list mapping from active datesheet
+    const mappedDuties = filtered.map((d: any, idx: number) => ({
+      id: d.id,
+      date: d.date,
+      time: `${d.startTime} - ${d.endTime}`,
+      course: d.course?.title || "Class Exam",
+      invigilator: faculties[idx % faculties.length]?.user?.name || "Staff Member",
+      status: idx % 3 === 0 ? "CONFIRMED" : "PENDING",
+    }));
+    setDuties(mappedDuties);
 
-
-
-
-
+    setLoading(false);
+  };
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -167,7 +202,7 @@ export default function InterTimetableDatesheetPage() {
                     onChange={(e) => setTSession(e.target.value)}
                     className={SELECT_CLS}
                   >
-                    {SESSION_YEARS.map((y) => (
+                    {sessions.map((y) => (
                       <option key={y} value={y}>{y}</option>
                     ))}
                   </select>

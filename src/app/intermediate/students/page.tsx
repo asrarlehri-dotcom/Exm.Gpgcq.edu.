@@ -63,6 +63,23 @@ export default function IntermediateStudentsPage() {
     fetchAll();
   };
 
+  const handleDelete = async (s: any) => {
+    if (!confirm(`Are you sure you want to delete student "${s.user?.name}"?`)) return;
+    setError(""); setSuccess("");
+    try {
+      const res = await fetch(`/api/students/${s.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccess(`Student "${s.user?.name}" deleted successfully!`);
+        fetchAll();
+      } else {
+        setError(data.error || "Delete failed");
+      }
+    } catch {
+      setError("Failed to delete student");
+    }
+  };
+
   const filtered = students.filter(s =>
     s.user?.name?.toLowerCase().includes(search.toLowerCase()) ||
     s.user?.email?.toLowerCase().includes(search.toLowerCase()) ||
@@ -111,7 +128,11 @@ export default function IntermediateStudentsPage() {
                     <td className="px-4 py-3 text-xs text-gray-700">{s.program?.name || "—"}</td>
                     <td className="px-4 py-3 text-xs text-gray-700">{s.group?.name || "—"}</td>
                     <td className="px-4 py-3"><button onClick={() => handleToggle(s)} className={`px-2 py-1 text-xs rounded-full font-semibold ${s.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>{s.isActive ? "Active" : "Inactive"}</button></td>
-                    <td className="px-4 py-3"><button onClick={() => setEditItem({ ...s, programId: s.programId || "", groupId: s.groupId || "" })} className="text-blue-600 text-xs hover:underline font-medium">Edit</button></td>
+                    <td className="px-4 py-3 flex items-center gap-2">
+                      <button onClick={() => setEditItem({ ...s, programId: s.programId || "", groupId: s.groupId || "" })} className="text-blue-600 text-xs hover:underline font-medium">Edit</button>
+                      <span className="text-gray-300">|</span>
+                      <button onClick={() => handleDelete(s)} className="text-red-600 text-xs hover:underline font-medium">Delete</button>
+                    </td>
                   </tr>
                 ))}
                 {filtered.length === 0 && <tr><td colSpan={7} className="text-center py-10 text-gray-400">No students found.</td></tr>}

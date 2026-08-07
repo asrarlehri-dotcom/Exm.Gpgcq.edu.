@@ -4,13 +4,12 @@ import { useState, useEffect } from "react";
 const INPUT = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
 const BTN_PRIMARY = "px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50";
 const BTN_GRAY = "px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200";
-const SESSIONS = ["2022", "2023", "2024", "2025", "2026", "2027"];
-
 export default function CoursesPage() {
   const [courses, setCourses] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [facultyList, setFacultyList] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<any | null>(null);
@@ -38,16 +37,25 @@ export default function CoursesPage() {
     if (filterSem) params.set("semester", filterSem);
     if (filterSession) params.set("session", filterSession);
 
-    const [cRes, pRes, dRes, fRes] = await Promise.all([
+    const [cRes, pRes, dRes, fRes, sRes] = await Promise.all([
       fetch(`/api/courses?${params}`),
       fetch("/api/programs"),
       fetch("/api/departments"),
       fetch("/api/faculty"),
+      fetch("/api/settings"),
     ]);
     if (cRes.ok) setCourses(await cRes.json());
     if (pRes.ok) setPrograms(await pRes.json());
     if (dRes.ok) setDepartments(await dRes.json());
     if (fRes.ok) setFacultyList(await fRes.json());
+    if (sRes.ok) {
+      const data = await sRes.json();
+      if (data.ACADEMIC_SESSIONS) {
+        setSessions(data.ACADEMIC_SESSIONS.split(",").map((s: string) => s.trim()).filter(Boolean));
+      } else {
+        setSessions(["2022", "2023", "2024", "2025", "2026", "2027"]);
+      }
+    }
     setLoading(false);
   };
 
@@ -79,28 +87,149 @@ export default function CoursesPage() {
     fetchAll();
   };
 
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const text = evt.target?.result as string;
+      const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+      if (lines.length < 2) {
+        setError("Invalid CSV file format.");
+        return;
+      }
+      const headers = lines[0].split(",").map(h => h.trim().replace(/^["']|["']$/g, ""));
+      
+      const parsedCourses = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(",").map(v => v.trim().replace(/^["']|["']$/g, ""));
+        const row: Record<string, string> = {};
+        headers.forEach((h, idx) => {
+          row[h] = values[idx] || "";
+        });
+        parsedCourses.push(row);
+      }
+      
+      let successCount = 0;
+      let failCount = 0;
+      for (const item of parsedCourses) {
+        const prog = programs.find(p => p.name.toLowerCase() === item.programName?.toLowerCase() || p.code?.toLowerCase() === item.programCode?.toLowerCase());
+        const dept = departments.find(d => d.name.toLowerCase() === item.departmentName?.toLowerCase() || d.code?.toLowerCase() === item.departmentCode?.toLowerCase());
+        
+        const payload = {
+          title: item.title || item.name,
+          code: item.code,
+          creditHours: Number(item.creditHours || 3),
+          courseType: item.courseType || "THEORY",
+          session: item.session || "2026",
+          semester: Number(item.semester || 1),
+          programId: prog ? prog.id : (item.programId || null),
+          departmentId: dept ? dept.id : (item.departmentId || null),
+          facultyId: item.facultyId || null,
+        };
+        
+        try {
+          const res = await fetch("/api/courses", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          if (res.ok) successCount++;
+          else failCount++;
+        } catch (err) {
+          failCount++;
+        }
+      }
+      setSuccess(`Imported courses: ${successCount} successful, ${failCount} failed.`);
+      fetchAll();
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExportCSV = () => {
+    const headers = ["Course Title", "Course Code", "Credit Hours", "Type", "Session", "Semester", "Program", "Department"];
+    const rows = courses.map(c => [
+      c.title,
+      c.code,
+      c.creditHours,
+      c.courseType,
+      c.session || "N/A",
+      c.semester,
+      programs.find(p => p.id === c.programId)?.name || "N/A",
+      departments.find(d => d.id === c.departmentId)?.name || "N/A"
+    ]);
+    
+    let csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+      + [headers.join(","), ...rows.map(e => e.map(val => `"${val}"`).join(","))].join("\n");
+      
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `courses_export_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportPDF = () => {
+    window.print();
+  };
+
   const F = ({ label, children }: any) => (
     <div><label className="block text-xs font-semibold text-gray-500 mb-1">{label}</label>{children}</div>
   );
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
+      {/* Print Page adjustments */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          aside, .sidebar, .print-hide, .no-print, button, label, input, select, header {
+            display: none !important;
+          }
+          html, body, div.flex.h-screen, main {
+            height: auto !important;
+            overflow: visible !important;
+          }
+          main {
+            padding: 0 !important;
+            margin: 0 !important;
+            background: white !important;
+          }
+        }
+      `}} />
+
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center print:hidden">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">📚 Course Management</h1>
           <p className="text-gray-500 mt-1">Create and manage BS courses with faculty assignments.</p>
         </div>
-        <button onClick={() => setShowAdd(true)} className={BTN_PRIMARY}>+ Add Course</button>
+        <div className="flex gap-2 items-center flex-wrap">
+          {/* CSV Import */}
+          <label className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors cursor-pointer border flex items-center gap-1">
+            📥 Import CSV
+            <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
+          </label>
+          {/* CSV Export */}
+          <button onClick={handleExportCSV} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors border flex items-center gap-1">
+            📤 Export CSV
+          </button>
+          {/* PDF Export */}
+          <button onClick={handleExportPDF} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors border flex items-center gap-1">
+            🖨️ Export PDF
+          </button>
+          <button onClick={() => setShowAdd(true)} className={BTN_PRIMARY}>+ Add Course</button>
+        </div>
       </div>
 
       {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-100">{error}</div>}
       {success && <div className="bg-green-50 text-green-600 p-3 rounded-lg text-sm border border-green-100">{success}</div>}
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-3">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-3 print:hidden">
         <select className="px-3 py-2 border rounded-lg text-sm" value={filterSession} onChange={e => setFilterSession(e.target.value)}>
           <option value="">-- All Sessions --</option>
-          {SESSIONS.map(s => <option key={s} value={s}>{s}</option>)}
+          {sessions.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <select className="px-3 py-2 border rounded-lg text-sm" value={filterProg} onChange={e => setFilterProg(e.target.value)}>
           <option value="">-- All Programs --</option>
@@ -158,7 +287,7 @@ export default function CoursesPage() {
                 <F label="Code *"><input required className={INPUT} placeholder="e.g. CS-201" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} /></F>
                 <F label="Credit Hours *"><input required type="number" min="1" max="4" className={INPUT} value={form.creditHours} onChange={e => setForm(f => ({ ...f, creditHours: e.target.value }))} /></F>
                 <F label="Type"><select className={INPUT} value={form.courseType} onChange={e => setForm(f => ({ ...f, courseType: e.target.value }))}><option value="THEORY">Theory</option><option value="PRACTICAL">Practical</option></select></F>
-                <F label="Session"><select className={INPUT} value={form.session} onChange={e => setForm(f => ({ ...f, session: e.target.value }))}>{SESSIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></F>
+                <F label="Session"><select className={INPUT} value={form.session} onChange={e => setForm(f => ({ ...f, session: e.target.value }))}>{sessions.map(s => <option key={s} value={s}>{s}</option>)}</select></F>
                 <F label="Semester *"><select required className={INPUT} value={form.semester} onChange={e => setForm(f => ({ ...f, semester: e.target.value }))}>{[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>{s}</option>)}</select></F>
               </div>
               <F label="Program *"><select required className={INPUT} value={form.programId} onChange={e => setForm(f => ({ ...f, programId: e.target.value }))}><option value="">-- Select Program --</option>{programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></F>

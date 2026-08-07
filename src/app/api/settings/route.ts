@@ -9,6 +9,7 @@ const DEFAULT_SETTINGS = [
   { key: "CHALLAN_SEQUENCE_CURRENT", value: "135622565" },
   { key: "ROLL_NUMBER_PATTERN", value: "[YEAR]-[CODE]-[SEQ]" },
   { key: "ROLL_SEQUENCE_CURRENT", value: "1" },
+  { key: "ACADEMIC_SESSIONS", value: "2022,2023,2024,2025,2026,2027" },
 ];
 
 export async function GET() {

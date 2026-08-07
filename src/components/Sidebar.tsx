@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePermissions } from "@/lib/usePermissions";
 import { MODULES, ACTIONS } from "@/lib/permissions";
 
@@ -27,15 +27,40 @@ export function Sidebar() {
   const { can } = usePermissions();
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    "Intermediate":              true,
-    "BS Program":                true,
+    "Intermediate":              false,
+    "BS Program":                false,
     "Results / Gazette / Merit": false,
     "Status / Academic Actions": false,
     "System":                    false,
   });
 
-  const toggleGroup = (title: string) =>
-    setExpandedGroups((prev) => ({ ...prev, [title]: !prev[title] }));
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebar_expanded_groups");
+    if (saved) {
+      try {
+        setExpandedGroups(JSON.parse(saved));
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      // Default initial states on first visit
+      setExpandedGroups({
+        "Intermediate":              false,
+        "BS Program":                true,
+        "Results / Gazette / Merit": false,
+        "Status / Academic Actions": false,
+        "System":                    false,
+      });
+    }
+  }, []);
+
+  const toggleGroup = (title: string) => {
+    setExpandedGroups((prev) => {
+      const next = { ...prev, [title]: !prev[title] };
+      localStorage.setItem("sidebar_expanded_groups", JSON.stringify(next));
+      return next;
+    });
+  };
 
   if (!session) return null;
   const role = (session.user as any)?.role as string;
@@ -85,6 +110,7 @@ export function Sidebar() {
         { href: "/admin/settings",    label: "⚙️ Programs & Departments", module: MODULES.BS_ACADEMIC_SETUP },
         { href: "/bs/courses",        label: "📚 Courses & Syllabus",    module: MODULES.BS_COURSES },
         { href: "/bs/fees",           label: "💰 Fees & Dues",            module: MODULES.BS_FEES },
+        { href: "/bs/attendance",     label: "✅ Attendance",             module: MODULES.BS_ATTENDANCE },
         { href: "/bs/timetable-datesheet", label: "📅 Timetable",        module: MODULES.BS_TIMETABLE },
         { href: "/bs/exams-results",  label: "📊 Examination & Conduct", module: MODULES.BS_EXAMS },
       ],

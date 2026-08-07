@@ -13,8 +13,6 @@ import {
   deleteDatesheetEntry,
 } from "./actions";
 
-const SESSION_YEARS = ["2022", "2023", "2024", "2025", "2026", "2027"];
-
 const SELECT_CLS =
   "px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white";
 
@@ -27,6 +25,7 @@ export default function BSTimetableDatesheetPage() {
   const [allPrograms, setAllPrograms] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [faculties, setFaculties] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<string[]>([]);
 
   // ── TIMETABLE filters (fixed to BS level)
   const [tSession, setTSession] = useState("2026");
@@ -58,6 +57,17 @@ export default function BSTimetableDatesheetPage() {
         setDProgramId(bsProgs[0].id);
       }
     });
+
+    fetch("/api/settings")
+      .then(res => res.json())
+      .then(data => {
+        if (data.ACADEMIC_SESSIONS) {
+          setSessions(data.ACADEMIC_SESSIONS.split(",").map((s: string) => s.trim()).filter(Boolean));
+        } else {
+          setSessions(["2022", "2023", "2024", "2025", "2026", "2027"]);
+        }
+      })
+      .catch(() => setSessions(["2022", "2023", "2024", "2025", "2026", "2027"]));
   }, []);
 
   const loadTimetable = async () => {
@@ -235,7 +245,7 @@ export default function BSTimetableDatesheetPage() {
                     onChange={(e) => setTSession(e.target.value)}
                     className={SELECT_CLS}
                   >
-                    {SESSION_YEARS.map((y) => (
+                    {sessions.map((y) => (
                       <option key={y} value={y}>{y}</option>
                     ))}
                   </select>
@@ -362,7 +372,7 @@ export default function BSTimetableDatesheetPage() {
                     onChange={(e) => setDSession(e.target.value)}
                     className={SELECT_CLS}
                   >
-                    {SESSION_YEARS.map((y) => (
+                    {sessions.map((y) => (
                       <option key={y} value={y}>{y}</option>
                     ))}
                   </select>

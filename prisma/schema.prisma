@@ -157,6 +157,8 @@ model Student {
   fatherName      String?
   cnic            String?
   contactNumber   String?
+  residentAddress String?
+  customFields    String?        // JSON string of custom dynamic fields
   
   // Intermediate specific
   programId       String?
@@ -167,6 +169,13 @@ model Student {
   // BS specific
   bsAdmissionType String?        // "REGULAR" or "BRIDGING_5TH"
   currentSemester Int?
+  
+  // B.Sc / ADP Details
+  bscGroup        String?
+  bscObtained     Int?
+  bscTotal        Int?
+  bscYear         Int?
+  bscBoard        String?
   
   fees            Fee[]
   challans        Challan[]
@@ -216,10 +225,12 @@ model Admission {
   id              String         @id @default(uuid())
   studentName     String
   fatherName      String
-  cnic            String         @unique
+  cnic            String?        @unique
   dateOfBirth     DateTime
   contactNumber   String
-  email           String         @unique
+  email           String?        @unique
+  residentAddress String?
+  customFields    String?        // JSON string of custom dynamic fields
   educationLevel  String         // "INTERMEDIATE" or "BS"
   
   // Intermediate specific
@@ -249,6 +260,14 @@ model Admission {
   hsscTotal       Int?
   hsscYear        Int?
   hsscBoard       String?        @default("BBISE QUETTA")
+
+  bscGroup        String?        // "B_SC" | "ADP_CS" | "ADP_ARTS" | "ADP_SCIENCE"
+  bscObtained     Int?
+  bscTotal        Int?
+  bscYear         Int?
+  bscBoard        String?        @default("UNIVERSITY OF BALOCHISTAN")
+
+  previousMarksJson String?      // JSON array of previous semester marks: [{"courseId":"...", "obtainedMarks":85, "totalMarks":100}]
 
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -299,14 +318,18 @@ model SystemSetting {
 // ─── Fee Settings (configurable fee amounts) ─────────────────────────────────
 model FeeSettings {
   id          String   @id @default(uuid())
-  key         String   @unique  // e.g. "BS_ADMISSION", "BS_SEMESTER", "INTER_ADMISSION"
+  key         String            // e.g. "BS_ADMISSION", "BS_SEMESTER", "INTER_ADMISSION"
+  session     String?           // Academic session year e.g. "2022"
   label       String            // Display name e.g. "BS Admission Fee"
   amount      Float             // Fee amount in PKR
   isLocked    Boolean  @default(false) // If true, amount cannot be changed
+  isActive    Boolean  @default(true)  // Active/inactive status
   description String?           // Optional note
   category    String?           // "BS" | "INTERMEDIATE" | "EXAM" | "OTHER"
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@unique([key, session])
 }
 
 model Fee {

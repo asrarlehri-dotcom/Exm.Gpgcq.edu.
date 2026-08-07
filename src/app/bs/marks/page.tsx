@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { getTimetables, getDatesheets } from "../timetable-datesheet/actions";
 
 const INPUT = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
 const BTN_PRIMARY = "px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50";
@@ -17,9 +18,40 @@ export default function MarksPage() {
   const [entryMode, setEntryMode] = useState<"view" | "enter">("view");
   const [marksForm, setMarksForm] = useState<Record<string, any>>({});
 
+  // Filters State
+  const [search, setSearch] = useState("");
+  const [filterProgType, setFilterProgType] = useState("ALL");
+  const [filterSession, setFilterSession] = useState("ALL");
+  const [filterProgram, setFilterProgram] = useState("ALL");
+  const [filterSemester, setFilterSemester] = useState("ALL");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<string[]>([]);
+  const [activeCourseIds, setActiveCourseIds] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     fetch("/api/courses").then(r => r.json()).then(d => Array.isArray(d) ? setCourses(d) : setCourses([]));
-    fetch("/api/students").then(r => r.json()).then(d => Array.isArray(d) ? setStudents(d.filter((s: any) => s.isActive)) : setStudents([]));
+    fetch("/api/students").then(r => r.json()).then(d => Array.isArray(d) ? setStudents(d) : setStudents([]));
+    fetch("/api/programs").then(r => r.json()).then(d => Array.isArray(d) ? setPrograms(d) : setPrograms([]));
+    fetch("/api/settings").then(r => r.json()).then(d => {
+      if (d.ACADEMIC_SESSIONS) {
+        setSessions(d.ACADEMIC_SESSIONS.split(",").map((s: string) => s.trim()).filter(Boolean));
+      } else {
+        setSessions(["2022", "2023", "2024", "2025", "2026", "2027"]);
+      }
+    });
+
+    // Fetch scheduled courses from timetable and datesheet to restrict the course list
+    Promise.all([
+      getTimetables(),
+      getDatesheets()
+    ]).then(([timetables, datesheets]) => {
+      const activeIds = new Set<string>();
+      timetables.forEach((t: any) => { if (t.courseId) activeIds.add(t.courseId); });
+      datesheets.forEach((d: any) => { if (d.courseId) activeIds.add(d.courseId); });
+      setActiveCourseIds(activeIds);
+    }).catch(err => console.error("Error loading active course ids:", err));
   }, []);
 
   const loadMarks = async () => {
@@ -57,15 +89,99 @@ export default function MarksPage() {
     setSaving(false);
   };
 
+  const isStudentActive = (s: any) => {
+    if (!s.isActive) return false;
+    if (s.statuses && s.statuses.length > 0) {
+      const deactiveStatus = s.statuses.some((st: any) =>
+        ["FREEZE", "QUIT", "DROPOUT"].includes(st.statusType)
+      );
+      if (deactiveStatus) return false;
+    }
+    return true;
+  };
+
+  const filteredStudents = students.filter(s => {
+    const matchesSearch = 
+      s.user?.name?.toLowerCase().includes(search.toLowerCase()) ||
+      s.user?.email?.toLowerCase().includes(search.toLowerCase()) ||
+      s.rollNumber?.toLowerCase().includes(search.toLowerCase()) ||
+      s.cnic?.includes(search) ||
+      (s.rollNumber && s.rollNumber.includes(search));
+      
+    const matchesProgType = 
+      filterProgType === "ALL" ||
+      (filterProgType === "REGULAR" && (s.bsAdmissionType === "REGULAR" || !s.bsAdmissionType)) ||
+      (filterProgType === "BRIDGING" && s.bsAdmissionType === "BRIDGING_5TH") ||
+      (filterProgType === "MIGRATION" && s.bsAdmissionType === "MIGRATION");
+
+    const matchesSession =
+      filterSession === "ALL" ||
+      s.session === filterSession;
+
+    const matchesProgram =
+      filterProgram === "ALL" ||
+      s.programId === filterProgram;
+
+    const matchesSemester =
+      filterSemester === "ALL" ||
+      String(s.currentSemester) === filterSemester;
+
+    const studentActive = isStudentActive(s);
+    const matchesStatus =
+      filterStatus === "ALL" ||
+      (filterStatus === "ACTIVE" && studentActive) ||
+      (filterStatus === "DEACTIVE" && !studentActive);
+
+    return matchesSearch && matchesProgType && matchesSession && matchesProgram && matchesSemester && matchesStatus;
+  });
+
+  const filteredMarks = marks.filter(m => {
+    const s = m.student;
+    if (!s) return false;
+
+    const matchesSearch = 
+      s.user?.name?.toLowerCase().includes(search.toLowerCase()) ||
+      s.user?.email?.toLowerCase().includes(search.toLowerCase()) ||
+      s.rollNumber?.toLowerCase().includes(search.toLowerCase()) ||
+      s.cnic?.includes(search);
+      
+    const matchesProgType = 
+      filterProgType === "ALL" ||
+      (filterProgType === "REGULAR" && (s.bsAdmissionType === "REGULAR" || !s.bsAdmissionType)) ||
+      (filterProgType === "BRIDGING" && s.bsAdmissionType === "BRIDGING_5TH") ||
+      (filterProgType === "MIGRATION" && s.bsAdmissionType === "MIGRATION");
+
+    const matchesSession =
+      filterSession === "ALL" ||
+      s.session === filterSession;
+
+    const matchesProgram =
+      filterProgram === "ALL" ||
+      s.programId === filterProgram;
+
+    const matchesSemester =
+      filterSemester === "ALL" ||
+      String(s.currentSemester) === filterSemester;
+
+    const studentActive = isStudentActive(s);
+    const matchesStatus =
+      filterStatus === "ALL" ||
+      (filterStatus === "ACTIVE" && studentActive) ||
+      (filterStatus === "DEACTIVE" && !studentActive);
+
+    return matchesSearch && matchesProgType && matchesSession && matchesProgram && matchesSemester && matchesStatus;
+  });
+
   const initBlankMarks = () => {
     const init: Record<string, any> = { ...marksForm };
-    students.forEach(s => {
+    filteredStudents.forEach(s => {
       if (!init[s.id]) init[s.id] = { assignment: 0, quiz: 0, midterm: 0, final: 0, total: 100 };
     });
     setMarksForm(init);
   };
 
   const course = courses.find(c => c.id === selectedCourse);
+  const activeCourses = courses.filter(c => activeCourseIds.has(c.id));
 
   return (
     <div className="space-y-6">
@@ -80,10 +196,10 @@ export default function MarksPage() {
       {/* Course Selector */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-3 items-end">
         <div className="flex-1 min-w-[250px]">
-          <label className="block text-xs font-semibold text-gray-500 mb-1">Select Course</label>
+          <label className="block text-xs font-semibold text-gray-500 mb-1">Select Course (Scheduled in Timetable/Datesheet)</label>
           <select className={INPUT} value={selectedCourse} onChange={e => setSelectedCourse(e.target.value)}>
             <option value="">-- Select a Course --</option>
-            {courses.map(c => <option key={c.id} value={c.id}>{c.title} — Sem {c.semester} ({c.program?.name || ""})</option>)}
+            {activeCourses.map(c => <option key={c.id} value={c.id}>{c.title} — Sem {c.semester} ({c.program?.name || ""})</option>)}
           </select>
         </div>
         <button onClick={loadMarks} disabled={!selectedCourse || loading} className={BTN_PRIMARY}>{loading ? "Loading..." : "Load Marks"}</button>
@@ -92,12 +208,96 @@ export default function MarksPage() {
         ) : null}
       </div>
 
+      {/* Student Filters */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-4 items-end">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Search Students</label>
+            <input
+              className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+              placeholder="Search name, email, roll..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Program Type</label>
+            <select
+              value={filterProgType}
+              onChange={e => setFilterProgType(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+            >
+              <option value="ALL">All Types</option>
+              <option value="REGULAR">BS Regular</option>
+              <option value="BRIDGING">BS 5th / Bridging</option>
+              <option value="MIGRATION">Migration</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Session</label>
+            <select
+              value={filterSession}
+              onChange={e => setFilterSession(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+            >
+              <option value="ALL">All Sessions</option>
+              {sessions.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Program</label>
+            <select
+              value={filterProgram}
+              onChange={e => setFilterProgram(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+            >
+              <option value="ALL">All Programs</option>
+              {programs.filter(p => p.educationLevel === "BS").map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Semester</label>
+            <select
+              value={filterSemester}
+              onChange={e => setFilterSemester(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+            >
+              <option value="ALL">All Semesters</option>
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
+                <option key={sem} value={String(sem)}>Semester {sem}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Status</label>
+            <select
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="ACTIVE">Active Only</option>
+              <option value="DEACTIVE">Inactive Only</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* Marks Table — View Mode */}
       {entryMode === "view" && marks.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-5 py-3 border-b bg-gray-50 flex justify-between items-center">
             <h2 className="font-semibold text-gray-800">{course?.title} — Marks Summary</h2>
-            <span className="text-sm text-gray-500">{marks.length} students</span>
+            <span className="text-sm text-gray-500">{filteredMarks.length} students</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -109,7 +309,7 @@ export default function MarksPage() {
                 </tr>
               </thead>
               <tbody>
-                {marks.map(m => {
+                {filteredMarks.map(m => {
                   const pct = m.totalMarks > 0 ? ((m.obtainedMarks / m.totalMarks) * 100).toFixed(1) : "0";
                   const pass = parseFloat(pct) >= 50;
                   return (
@@ -156,7 +356,7 @@ export default function MarksPage() {
                 </tr>
               </thead>
               <tbody>
-                {students.map(s => {
+                {filteredStudents.map(s => {
                   const m = marksForm[s.id] || { assignment: 0, quiz: 0, midterm: 0, final: 0, total: 100 };
                   const upd = (k: string, v: string) => setMarksForm(f => ({ ...f, [s.id]: { ...m, [k]: parseFloat(v) || 0 } }));
                   return (

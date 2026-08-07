@@ -45,12 +45,37 @@ export default function AdmissionPage() {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [contactNumber, setContactNumber] = useState("");
   const [email, setEmail] = useState("");
+  const [residentAddress, setResidentAddress] = useState("");
+
+  const [admissionSettings, setAdmissionSettings] = useState<any>({
+    requiredFields: ["studentName", "fatherName", "cnic", "dateOfBirth", "contactNumber", "email"],
+    cnicLength: 15,
+    contactLength: 11,
+    customFields: []
+  });
+  
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
 
   const [programId, setProgramId] = useState("");
-  const [session, setSession] = useState(CURRENT_YEAR);
+  const [entryYear, setEntryYear] = useState(CURRENT_YEAR);
   const [bsAdmissionType, setBsAdmissionType] = useState("REGULAR");
   const [migrationSemester, setMigrationSemester] = useState("");
   const [gender, setGender] = useState("MALE");
+
+  const getCalculatedSession = () => {
+    const startYear = parseInt(entryYear) || new Date().getFullYear();
+    if (bsAdmissionType === "REGULAR") {
+      return `${startYear}-${startYear + 4}`;
+    } else if (bsAdmissionType === "BRIDGING_5TH") {
+      return `${startYear}-${startYear + 2}`;
+    } else if (bsAdmissionType === "MIGRATION") {
+      const sem = parseInt(migrationSemester) || 1;
+      const offset = Math.floor((sem - 1) / 2);
+      const batchStart = startYear - offset;
+      return `${batchStart}-${batchStart + 4}`;
+    }
+    return `${startYear}-${startYear + 4}`;
+  };
 
   // SSC Qualifications
   const [sscGroup, setSscGroup] = useState("SCIENCE");
@@ -66,8 +91,21 @@ export default function AdmissionPage() {
   const [hsscYear, setHsscYear] = useState("");
   const [hsscBoard, setHsscBoard] = useState("BBISE QUETTA");
 
+  // B.Sc / ADP Qualifications
+  const [bscGroup, setBscGroup] = useState("B_SC");
+  const [bscObtained, setBscObtained] = useState("");
+  const [bscTotal, setBscTotal] = useState("800");
+  const [bscYear, setBscYear] = useState("");
+  const [bscBoard, setBscBoard] = useState("UNIVERSITY OF BALOCHISTAN");
+
+  // Migration Previous Marks
+  const [allCourses, setAllCourses] = useState<any[]>([]);
+  const [prevMarks, setPrevMarks] = useState<Record<string, { obtained: string, total: string }>>({});
+
+  const previousCourses = allCourses.filter((c: any) => c.semester < (Number(migrationSemester) || 1));
+
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [successData, setSuccessData] = useState<{ admissionId: string; challanId: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -75,7 +113,34 @@ export default function AdmissionPage() {
       .then(res => res.json())
       .then(data => setPrograms(Array.isArray(data) ? data : []))
       .catch(() => setPrograms([]));
+      
+    fetch("/api/settings")
+      .then(res => res.json())
+      .then(data => {
+        let parsedCustomFields = [];
+        if (data.ADMISSION_CUSTOM_FIELDS) {
+          try { parsedCustomFields = JSON.parse(data.ADMISSION_CUSTOM_FIELDS); } catch(e) {}
+        }
+        setAdmissionSettings({
+          requiredFields: data.ADMISSION_REQUIRED_FIELDS ? data.ADMISSION_REQUIRED_FIELDS.split(",").map((s:string) => s.trim()) : ["studentName", "fatherName", "cnic", "dateOfBirth", "contactNumber", "email"],
+          cnicLength: parseInt(data.ADMISSION_CNIC_LENGTH) || 15,
+          contactLength: parseInt(data.ADMISSION_CONTACT_LENGTH) || 11,
+          customFields: parsedCustomFields
+        });
+      })
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!programId) {
+      setAllCourses([]);
+      return;
+    }
+    fetch(`/api/public/courses?programId=${programId}`)
+      .then(res => res.json())
+      .then(data => setAllCourses(Array.isArray(data) ? data : []))
+      .catch(() => setAllCourses([]));
+  }, [programId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,9 +150,25 @@ export default function AdmissionPage() {
       setError("Please select a program.");
       return;
     }
-    if (bsAdmissionType === "MIGRATION" && !migrationSemester) {
-      setError("Please select the semester you are migrating into.");
-      return;
+    if (bsAdmissionType === "MIGRATION") {
+      if (!migrationSemester) {
+        setError("Please select the semester you are migrating into.");
+        return;
+      }
+      // Validate all courses have obtained marks entered
+      for (const course of previousCourses) {
+        const mark = prevMarks[course.id];
+        if (!mark || !mark.obtained || !mark.total) {
+          setError(`Please enter obtained and total marks for the course: ${course.title} (${course.code})`);
+          return;
+        }
+      }
+    }
+    if (bsAdmissionType === "BRIDGING_5TH") {
+      if (!bscObtained || !bscTotal || !bscYear || !bscBoard) {
+        setError("Please complete all B.Sc / ADP Academic Qualification details.");
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -102,12 +183,14 @@ export default function AdmissionPage() {
           dateOfBirth,
           contactNumber,
           email,
+          residentAddress,
+          customFields: JSON.stringify(customFieldValues),
           educationLevel: "BS",
           programId,
           groupId: null,
           bsAdmissionType,
           migrationSemester: bsAdmissionType === "MIGRATION" ? Number(migrationSemester) : null,
-          session,
+          session: getCalculatedSession(),
           gender,
           sscGroup,
           sscObtained: sscObtained ? Number(sscObtained) : null,
@@ -119,11 +202,24 @@ export default function AdmissionPage() {
           hsscTotal: hsscTotal ? Number(hsscTotal) : null,
           hsscYear: hsscYear ? Number(hsscYear) : null,
           hsscBoard,
+          bscGroup: bsAdmissionType === "BRIDGING_5TH" ? bscGroup : null,
+          bscObtained: bsAdmissionType === "BRIDGING_5TH" ? (bscObtained ? Number(bscObtained) : null) : null,
+          bscTotal: bsAdmissionType === "BRIDGING_5TH" ? (bscTotal ? Number(bscTotal) : null) : null,
+          bscYear: bsAdmissionType === "BRIDGING_5TH" ? (bscYear ? Number(bscYear) : null) : null,
+          bscBoard: bsAdmissionType === "BRIDGING_5TH" ? bscBoard : null,
+          previousMarksJson: bsAdmissionType === "MIGRATION"
+            ? JSON.stringify(previousCourses.map(c => ({
+                courseId: c.id,
+                obtainedMarks: Number(prevMarks[c.id]?.obtained || 0),
+                totalMarks: Number(prevMarks[c.id]?.total || 100)
+              })))
+            : null,
         }),
       });
 
       if (res.ok) {
-        setSuccess(true);
+        const data = await res.json();
+        setSuccessData({ admissionId: data.admission.id, challanId: data.challanId });
       } else {
         const data = await res.json();
         setError(data.error || "Submission failed");
@@ -135,20 +231,40 @@ export default function AdmissionPage() {
     }
   };
 
-  if (success) {
+  if (successData) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full text-center border border-gray-100">
+          <div className="w-20 h-20 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl shadow-inner">
             ✓
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Application Submitted!</h2>
-          <p className="text-gray-600 mb-6">
-            Your BS admission application has been received. We will contact you soon.
+          <h2 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">Application Submitted!</h2>
+          <p className="text-gray-600 mb-8 font-medium">
+            Your admission application has been received. Please print your form and challan below.
           </p>
+          
+          <div className="space-y-4 mb-8">
+            <a
+              href={`/print/admission/${successData.admissionId}?autoPrint=true`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 px-6 py-3.5 bg-gray-900 text-white rounded-xl hover:bg-black transition-colors w-full font-bold shadow-md hover:shadow-lg"
+            >
+              📄 Print Admission Form (Portrait)
+            </a>
+            <a
+              href={`/print/challan/${successData.challanId}?autoPrint=true`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors w-full font-bold shadow-md hover:shadow-lg"
+            >
+              🧾 Print Processing Challan (Landscape)
+            </a>
+          </div>
+
           <button
             onClick={() => router.push("/")}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors w-full font-medium"
+            className="text-gray-500 hover:text-gray-700 font-semibold transition-colors underline underline-offset-4 text-sm"
           >
             Return to Home
           </button>
@@ -184,50 +300,68 @@ export default function AdmissionPage() {
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Student Name</label>
-                  <input type="text" required
+                  <label className="block text-sm font-medium text-gray-700">Student Name {admissionSettings.requiredFields.includes("studentName") && <span className="text-red-500">*</span>}</label>
+                  <input type="text" required={admissionSettings.requiredFields.includes("studentName")}
                     className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     value={studentName} onChange={e => setStudentName(e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Father's Name</label>
-                  <input type="text" required
+                  <label className="block text-sm font-medium text-gray-700">Father's Name {admissionSettings.requiredFields.includes("fatherName") && <span className="text-red-500">*</span>}</label>
+                  <input type="text" required={admissionSettings.requiredFields.includes("fatherName")}
                     className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     value={fatherName} onChange={e => setFatherName(e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">CNIC / Form B</label>
-                  <input type="text" required placeholder="12345-1234567-1"
+                  <label className="block text-sm font-medium text-gray-700">CNIC / Form B {admissionSettings.requiredFields.includes("cnic") && <span className="text-red-500">*</span>}</label>
+                  <input type="text" required={admissionSettings.requiredFields.includes("cnic")} placeholder="12345-1234567-1"
+                    maxLength={admissionSettings.cnicLength}
                     className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     value={cnic} onChange={e => setCnic(e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
-                  <input type="date" required
+                  <label className="block text-sm font-medium text-gray-700">Date of Birth {admissionSettings.requiredFields.includes("dateOfBirth") && <span className="text-red-500">*</span>}</label>
+                  <input type="date" required={admissionSettings.requiredFields.includes("dateOfBirth")}
                     className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Contact Number</label>
-                  <input type="tel" required
+                  <label className="block text-sm font-medium text-gray-700">Contact Number {admissionSettings.requiredFields.includes("contactNumber") && <span className="text-red-500">*</span>}</label>
+                  <input type="tel" required={admissionSettings.requiredFields.includes("contactNumber")}
+                    maxLength={admissionSettings.contactLength}
                     className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     value={contactNumber} onChange={e => setContactNumber(e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Email Address</label>
-                  <input type="email" required
+                  <label className="block text-sm font-medium text-gray-700">Email Address {admissionSettings.requiredFields.includes("email") && <span className="text-red-500">*</span>}</label>
+                  <input type="email" required={admissionSettings.requiredFields.includes("email")}
                     className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     value={email} onChange={e => setEmail(e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Gender</label>
-                  <select required
+                  <label className="block text-sm font-medium text-gray-700">Gender {admissionSettings.requiredFields.includes("gender") && <span className="text-red-500">*</span>}</label>
+                  <select required={admissionSettings.requiredFields.includes("gender")}
                     className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                     value={gender} onChange={e => setGender(e.target.value)}>
                     <option value="MALE">Male</option>
                     <option value="FEMALE">Female</option>
                   </select>
                 </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700">Resident Address {admissionSettings.requiredFields.includes("residentAddress") && <span className="text-red-500">*</span>}</label>
+                  <textarea required={admissionSettings.requiredFields.includes("residentAddress")} rows={2}
+                    className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={residentAddress} onChange={e => setResidentAddress(e.target.value)} />
+                </div>
+                {admissionSettings.customFields.map((cf: any) => (
+                  <div key={cf.id} className={cf.type === 'text' ? "sm:col-span-2" : ""}>
+                    <label className="block text-sm font-medium text-gray-700">{cf.label} {cf.required && <span className="text-red-500">*</span>}</label>
+                    <input type={cf.type} required={cf.required}
+                      className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={customFieldValues[cf.id] || ""}
+                      onChange={e => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -263,7 +397,7 @@ export default function AdmissionPage() {
                 {/* Session */}
                 <div className="sm:col-span-1">
                   <label className="block text-sm font-medium text-gray-700">
-                    Academic Session (Year)
+                    Admission Year
                   </label>
                   <div className="relative mt-1">
                     <input
@@ -271,21 +405,22 @@ export default function AdmissionPage() {
                       required
                       min="2000"
                       max="2099"
-                      value={session}
-                      onChange={e => setSession(e.target.value)}
+                      value={entryYear}
+                      onChange={e => setEntryYear(e.target.value)}
                       className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                     <button
                       type="button"
-                      onClick={() => setSession(CURRENT_YEAR)}
+                      onClick={() => setEntryYear(CURRENT_YEAR)}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-blue-600 hover:underline font-medium"
                     >
                       Reset to {CURRENT_YEAR}
                     </button>
                   </div>
-                  <p className="mt-1 text-xs text-gray-400">
-                    Default is current year ({CURRENT_YEAR}). Change if needed.
-                  </p>
+                  <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-100 flex items-center justify-between text-xs">
+                    <span className="text-gray-500">Allocated Session:</span>
+                    <span className="font-bold text-blue-700 font-mono text-sm">{getCalculatedSession()}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -369,6 +504,108 @@ export default function AdmissionPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* B.Sc / ADP Details Card */}
+                {bsAdmissionType === "BRIDGING_5TH" && (
+                  <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 space-y-4">
+                    <h3 className="font-bold text-gray-800 text-sm uppercase tracking-wider">🎓 B.Sc / ADP Details</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600">Group / Degree</label>
+                        <select required value={bscGroup} onChange={e => setBscGroup(e.target.value)}
+                          className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-400">
+                          <option value="B_SC">B.Sc (Physical/General Science)</option>
+                          <option value="ADP_CS">ADP (Computer Science)</option>
+                          <option value="ADP_SCIENCE">ADP (Science / Math)</option>
+                          <option value="ADP_ARTS">ADP (Arts / Humanities)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600">Obtained Marks</label>
+                        <input type="number" required placeholder="550" value={bscObtained} onChange={e => setBscObtained(e.target.value)}
+                          className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600">Total Marks</label>
+                        <input type="number" required placeholder="800" value={bscTotal} onChange={e => setBscTotal(e.target.value)}
+                          className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600">Passing Year</label>
+                        <input type="number" required placeholder="2026" value={bscYear} onChange={e => setBscYear(e.target.value)}
+                          className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600">University</label>
+                        <input type="text" required value={bscBoard} onChange={e => setBscBoard(e.target.value)}
+                          className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Migration Previous Semester Courses Marks Card */}
+                {bsAdmissionType === "MIGRATION" && migrationSemester && (
+                  <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 space-y-4">
+                    <div>
+                      <h3 className="font-bold text-gray-800 text-sm uppercase tracking-wider">🔄 Previous Semester Course Marks</h3>
+                      <p className="text-xs text-gray-500 mt-1">Please enter your obtained and total marks for courses of semesters prior to Semester {migrationSemester}.</p>
+                    </div>
+
+                    {previousCourses.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">No college courses found for previous semesters. Please select a program first.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {previousCourses.map((course: any) => (
+                          <div key={course.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center border-b pb-2">
+                            <div className="sm:col-span-6">
+                              <span className="text-xs font-semibold text-gray-400 font-mono block">Semester {course.semester}</span>
+                              <span className="text-sm font-bold text-gray-800">{course.title}</span>
+                              <span className="text-xs text-gray-500 block">{course.code} • {course.creditHours} Credits</span>
+                            </div>
+                            <div className="sm:col-span-3">
+                              <label className="block text-[10px] font-semibold text-gray-500 uppercase">Obtained Marks</label>
+                              <input
+                                type="number"
+                                required
+                                min="0"
+                                max={Number(prevMarks[course.id]?.total || 100)}
+                                placeholder="Marks"
+                                value={prevMarks[course.id]?.obtained || ""}
+                                onChange={e => setPrevMarks(prev => ({
+                                  ...prev,
+                                  [course.id]: {
+                                    obtained: e.target.value,
+                                    total: prev[course.id]?.total || "100"
+                                  }
+                                }))}
+                                className="w-full mt-1 px-3 py-1 border rounded text-xs outline-none focus:ring-2 focus:ring-blue-400"
+                              />
+                            </div>
+                            <div className="sm:col-span-3">
+                              <label className="block text-[10px] font-semibold text-gray-500 uppercase">Total Marks</label>
+                              <input
+                                type="number"
+                                required
+                                min="1"
+                                placeholder="Total"
+                                value={prevMarks[course.id]?.total || "100"}
+                                onChange={e => setPrevMarks(prev => ({
+                                  ...prev,
+                                  [course.id]: {
+                                    obtained: prev[course.id]?.obtained || "",
+                                    total: e.target.value
+                                  }
+                                }))}
+                                className="w-full mt-1 px-3 py-1 border rounded text-xs outline-none focus:ring-2 focus:ring-blue-400"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

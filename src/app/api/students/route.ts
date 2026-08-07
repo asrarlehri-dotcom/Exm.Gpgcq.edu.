@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
         ...(educationLevel && { educationLevel }),
         ...(programId && { programId }),
       },
-      include: { user: true, program: true, group: true },
+      include: { user: true, program: true, group: true, statuses: true },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(students);

@@ -40,13 +40,21 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id, amount, isLocked, description } = await request.json();
+    const { id, amount, isLocked, isActive, description, key, label, category } = await request.json();
 
     // Check if fee is locked
     const existing = await prisma.feeSettings.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: "Fee not found" }, { status: 404 });
-    if (existing.isLocked && amount !== undefined) {
-      return NextResponse.json({ error: "This fee is locked and cannot be modified." }, { status: 403 });
+
+    const isEditingLockedFields = (
+      (amount !== undefined && Number(amount) !== existing.amount) ||
+      (key !== undefined && key !== existing.key) ||
+      (label !== undefined && label !== existing.label) ||
+      (category !== undefined && category !== existing.category)
+    );
+
+    if (existing.isLocked && isEditingLockedFields) {
+      return NextResponse.json({ error: "This fee is locked. Core fields cannot be modified." }, { status: 403 });
     }
 
     const updated = await prisma.feeSettings.update({
@@ -54,13 +62,99 @@ export async function PATCH(request: Request) {
       data: {
         ...(amount !== undefined ? { amount: Number(amount) } : {}),
         ...(isLocked !== undefined ? { isLocked } : {}),
+        ...(isActive !== undefined ? { isActive } : {}),
         ...(description !== undefined ? { description } : {}),
+        ...(key !== undefined ? { key } : {}),
+        ...(label !== undefined ? { label } : {}),
+        ...(category !== undefined ? { category } : {}),
       },
     });
 
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error updating fee setting:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || (session.user as any).role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { key, session: targetSession, amount, label, category, description } = await request.json();
+
+    if (!key || amount === undefined || !label) {
+      return NextResponse.json({ error: "Key, Label and Amount are required fields" }, { status: 400 });
+    }
+
+    const cleanSession = targetSession ? String(targetSession).trim() : null;
+
+    // Check if a fee setting with the same key and session already exists
+    const existing = await prisma.feeSettings.findFirst({
+      where: {
+        key,
+        session: cleanSession ? cleanSession : null
+      }
+    });
+
+    if (existing) {
+      return NextResponse.json({
+        error: cleanSession
+          ? `Fee override for key '${key}' and session '${cleanSession}' already exists.`
+          : `Base fee item with key '${key}' already exists.`
+      }, { status: 400 });
+    }
+
+    const created = await prisma.feeSettings.create({
+      data: {
+        key,
+        session: cleanSession ? cleanSession : null,
+        amount: Number(amount),
+        label,
+        category: category || "OTHER",
+        description: description || null,
+        isLocked: false,
+        isActive: true
+      }
+    });
+
+    return NextResponse.json(created);
+  } catch (error) {
+    console.error("Error creating fee setting:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || (session.user as any).role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const url = new URL(request.url);
+    const id = url.searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing id parameter" }, { status: 400 });
+    }
+
+    const existing = await prisma.feeSettings.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "Fee setting not found" }, { status: 404 });
+    }
+
+    if (existing.isLocked) {
+      return NextResponse.json({ error: "Locked fee configurations cannot be deleted." }, { status: 400 });
+    }
+
+    await prisma.feeSettings.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting fee setting override:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
