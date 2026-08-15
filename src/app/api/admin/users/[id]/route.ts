@@ -57,7 +57,7 @@ export async function DELETE(
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await prisma.user.delete({ where: { id } });
+  await prisma.user.update({ where: { id }, data: { isActive: false } });
 
   // Log the action
   await prisma.auditLog.create({
@@ -65,10 +65,10 @@ export async function DELETE(
       userId: (session.user as any)?.id,
       userEmail: session.user?.email,
       userName: session.user?.name,
-      action: "DELETE",
+      action: "DEACTIVATE",
       entity: "User",
       entityId: id,
-      description: `User "${user.email}" deleted`,
+      description: `User "${user.email}" deactivated`,
     },
   });
 

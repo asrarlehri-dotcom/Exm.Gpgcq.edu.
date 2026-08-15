@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth";
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !["SUPER_ADMIN", "ADMIN", "FACULTY"].includes((session.user as any)?.role))
+    if (!session || !["SUPER_ADMIN", "ADMIN", "FACULTY", "BS_FACULTY", "INTER_FACULTY", "TEACHER", "BS_CONTROLLER"].includes((session.user as any)?.role))
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
@@ -63,9 +63,24 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { id } = await req.json();
-    await prisma.enrollment.delete({ where: { id } });
+    await prisma.enrollment.update({ where: { id }, data: { status: "DROPPED" } });
+    
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        userId: (session.user as any)?.id,
+        userEmail: session.user?.email,
+        userName: session.user?.name,
+        action: "UPDATE",
+        entity: "Enrollment",
+        entityId: id,
+        description: `Enrollment marked as DROPPED`,
+      },
+    });
+
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (error: any) {
+    console.error("Error dropping enrollment:", error);
     return NextResponse.json({ error: "Failed to delete enrollment" }, { status: 500 });
   }
 }

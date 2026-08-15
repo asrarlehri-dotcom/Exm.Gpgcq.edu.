@@ -16,6 +16,7 @@ export const VALID_ROLES = [
 export type UserRole = typeof VALID_ROLES[number];
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET || "supersecret_for_development",
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -68,5 +69,9 @@ export const authOptions: NextAuthOptions = {
       return session;
     }
   },
-  pages: { signIn: "/login" }
+  pages: {
+    signIn: "/login",
+    error: "/login",
+  }
 };
+

@@ -7,11 +7,11 @@ import bcrypt from "bcryptjs";
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !["SUPER_ADMIN", "ADMIN"].includes((session.user as any)?.role))
+    if (!session || !["SUPER_ADMIN", "ADMIN", "BS_CONTROLLER"].includes((session.user as any)?.role))
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const faculty = await prisma.faculty.findMany({
-      include: { user: true, department: true },
+      include: { user: true, department: true, courses: true },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(faculty);
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     if (!session || !["SUPER_ADMIN", "ADMIN"].includes((session.user as any)?.role))
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { name, email, password, departmentId } = await req.json();
+    const { name, email, password, fatherName, designation, qualification, contactNumber, departmentId, educationLevel } = await req.json();
     if (!name || !email || !password)
       return NextResponse.json({ error: "Name, email and password are required" }, { status: 400 });
 
@@ -40,7 +40,15 @@ export async function POST(req: NextRequest) {
     });
 
     const faculty = await prisma.faculty.create({
-      data: { userId: user.id, departmentId: departmentId || null },
+      data: {
+        userId: user.id,
+        fatherName: fatherName || null,
+        designation: designation || null,
+        qualification: qualification || null,
+        contactNumber: contactNumber || null,
+        departmentId: departmentId || null,
+        educationLevel: educationLevel || "BS",
+      } as any,
       include: { user: true, department: true },
     });
 
@@ -48,12 +56,13 @@ export async function POST(req: NextRequest) {
       data: {
         userEmail: session.user?.email, userName: session.user?.name,
         action: "CREATE", entity: "Faculty", entityId: faculty.id,
-        description: `Faculty "${name}" (${email}) registered`,
+        description: `Faculty "${name}" (${designation || 'Faculty Member'}) registered`,
       },
     });
 
     return NextResponse.json(faculty, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "Failed to register faculty" }, { status: 500 });
+  } catch (error: any) {
+    console.error("Create faculty error:", error);
+    return NextResponse.json({ error: "Failed to register faculty member" }, { status: 500 });
   }
 }

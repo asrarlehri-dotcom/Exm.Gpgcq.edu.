@@ -53,48 +53,20 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     if (!student) return NextResponse.json({ error: "Student not found" }, { status: 404 });
 
     await prisma.$transaction(async (tx) => {
-      // Clean up related records
-      await tx.studentStatus.deleteMany({ where: { studentId: id } });
-      await tx.promotion.deleteMany({ where: { studentId: id } });
-      await tx.fee.deleteMany({ where: { studentId: id } });
-      await tx.challan.updateMany({ where: { studentId: id }, data: { studentId: null } });
-      await tx.attendance.deleteMany({ where: { studentId: id } });
-      await tx.enrollment.deleteMany({ where: { studentId: id } });
-      await tx.marks.deleteMany({ where: { studentId: id } });
-      await tx.result.deleteMany({ where: { studentId: id } });
+      // Soft-delete the student record
+      await tx.student.update({ where: { id }, data: { isActive: false } });
 
-      // Delete the student record
-      await tx.student.delete({ where: { id } });
-
-      // Decrement sequence setting if the deleted student was the latest sequence
-      if (student.rollNumber) {
-        const match = student.rollNumber.match(/:(\d+)$/);
-        if (match) {
-          const deletedSeq = parseInt(match[1], 10);
-          const seqSetting = await tx.systemSetting.findUnique({ where: { key: "ROLL_SEQUENCE_CURRENT" } });
-          if (seqSetting) {
-            const currentSeqVal = Number(seqSetting.value);
-            if (deletedSeq + 1 === currentSeqVal) {
-              await tx.systemSetting.update({
-                where: { key: "ROLL_SEQUENCE_CURRENT" },
-                data: { value: String(deletedSeq) }
-              });
-            }
-          }
-        }
-      }
-
-      // Delete the user record
+      // Soft-delete the user record
       if (student.userId) {
-        await tx.user.delete({ where: { id: student.userId } });
+        await tx.user.update({ where: { id: student.userId }, data: { isActive: false } });
       }
     });
 
     await prisma.auditLog.create({
       data: {
         userEmail: session.user?.email, userName: session.user?.name,
-        action: "DELETE", entity: "Student", entityId: id,
-        description: `Student "${student.user?.name}" (${student.rollNumber}) deleted`,
+        action: "DEACTIVATE", entity: "Student", entityId: id,
+        description: `Student "${student.user?.name}" (${student.rollNumber}) deactivated`,
       },
     });
 

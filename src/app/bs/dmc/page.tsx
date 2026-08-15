@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getGPValue } from "@/lib/cgpa";
+import { useSettings } from "@/lib/useSettings";
 
 type StudentData = {
   id: string;
@@ -18,6 +19,7 @@ type StudentData = {
 };
 
 export default function DMCGeneratorPage() {
+  const { collegeName, collegeLogo, collegeTagline } = useSettings();
   const [students, setStudents] = useState<StudentData[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
   const [selectedSemester, setSelectedSemester] = useState<number>(1);
@@ -107,9 +109,14 @@ export default function DMCGeneratorPage() {
         <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-200 space-y-6 print:border-none print:shadow-none print:p-0">
           {/* Header of DMC */}
           <div className="text-center border-b pb-4 space-y-1">
-            <h2 className="text-xl font-black text-gray-900 uppercase">Detailed Marks Certificate</h2>
-            <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">College of Higher Education</p>
-            <p className="text-[10px] text-gray-400">Affiliated with University of the Punjab</p>
+            {collegeLogo ? (
+              <img src={collegeLogo} alt="College Logo" className="w-16 h-16 object-contain mx-auto mb-2" />
+            ) : (
+              <div className="text-3xl mb-1">🏛️</div>
+            )}
+            <h2 className="text-xl font-black text-gray-900 uppercase tracking-wide">{collegeName}</h2>
+            <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">{collegeTagline}</p>
+            <p className="text-sm font-bold text-gray-700 uppercase pt-1">Detailed Marks Certificate</p>
           </div>
 
           {/* Student Info Info */}

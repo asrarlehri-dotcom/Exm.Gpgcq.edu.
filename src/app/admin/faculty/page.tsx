@@ -16,8 +16,9 @@ export default function FacultyPage() {
   const [success, setSuccess] = useState("");
   const [search, setSearch] = useState("");
 
-  const [form, setForm] = useState({ name: "", email: "", password: "", departmentId: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", departmentId: "", educationLevel: "BOTH" });
   const [editDept, setEditDept] = useState("");
+  const [editLevel, setEditLevel] = useState("BOTH");
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -36,7 +37,7 @@ export default function FacultyPage() {
       body: JSON.stringify(form),
     });
     const data = await res.json();
-    if (res.ok) { setSuccess(`Faculty "${data.user?.name}" registered!`); setForm({ name: "", email: "", password: "", departmentId: "" }); setShowAdd(false); fetchAll(); }
+    if (res.ok) { setSuccess(`Faculty "${data.user?.name}" registered!`); setForm({ name: "", email: "", password: "", departmentId: "", educationLevel: "BOTH" }); setShowAdd(false); fetchAll(); }
     else setError(data.error);
     setSaving(false);
   };
@@ -45,7 +46,7 @@ export default function FacultyPage() {
     if (!editItem) return; setSaving(true); setError("");
     const res = await fetch(`/api/faculty/${editItem.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ departmentId: editDept || null }),
+      body: JSON.stringify({ departmentId: editDept || null, educationLevel: editLevel }),
     });
     if (res.ok) { setSuccess("Faculty updated!"); setEditItem(null); fetchAll(); }
     else { const d = await res.json(); setError(d.error); }
@@ -70,7 +71,7 @@ export default function FacultyPage() {
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">👨‍🏫 Faculty Management</h1>
-          <p className="text-gray-500 mt-1">Register, manage and assign faculty members to departments.</p>
+          <p className="text-gray-500 mt-1">Register, manage and assign faculty members to departments and level types.</p>
         </div>
         <button onClick={() => setShowAdd(true)} className={BTN_PRIMARY}>+ Add Faculty</button>
       </div>
@@ -92,6 +93,7 @@ export default function FacultyPage() {
                 <th className="px-5 py-3 font-semibold text-gray-600">#</th>
                 <th className="px-5 py-3 font-semibold text-gray-600">Name & Email</th>
                 <th className="px-5 py-3 font-semibold text-gray-600">Department</th>
+                <th className="px-5 py-3 font-semibold text-gray-600">Faculty Type</th>
                 <th className="px-5 py-3 font-semibold text-gray-600">Status</th>
                 <th className="px-5 py-3 font-semibold text-gray-600 text-center">Actions</th>
               </tr>
@@ -106,18 +108,27 @@ export default function FacultyPage() {
                   </td>
                   <td className="px-5 py-3 text-gray-700">{f.department?.name || <span className="text-gray-400 italic">Unassigned</span>}</td>
                   <td className="px-5 py-3">
+                    <span className={`px-2 py-0.5 text-xs font-bold rounded-md ${
+                      f.educationLevel === "INTERMEDIATE" ? "bg-amber-100 text-amber-800" :
+                      f.educationLevel === "BOTH" ? "bg-purple-100 text-purple-800" :
+                      "bg-emerald-100 text-emerald-800"
+                    }`}>
+                      {f.educationLevel === "INTERMEDIATE" ? "Inter Faculty" : f.educationLevel === "BOTH" ? "Both (BS & Inter)" : "BS Faculty"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3">
                     <button onClick={() => handleToggle(f)} className={`px-2 py-1 text-xs rounded-full font-semibold cursor-pointer ${f.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                       {f.isActive ? "Active" : "Inactive"}
                     </button>
                   </td>
                   <td className="px-5 py-3 text-center">
-                    <button onClick={() => { setEditItem(f); setEditDept(f.departmentId || ""); }} className="text-blue-600 text-xs hover:underline font-medium">
-                      Edit Dept
+                    <button onClick={() => { setEditItem(f); setEditDept(f.departmentId || ""); setEditLevel(f.educationLevel || "BOTH"); }} className="text-blue-600 text-xs hover:underline font-medium">
+                      Edit
                     </button>
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={5} className="text-center py-10 text-gray-400">No faculty found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={6} className="text-center py-10 text-gray-400">No faculty found.</td></tr>}
             </tbody>
           </table>
         )}
@@ -132,6 +143,13 @@ export default function FacultyPage() {
               <div><label className="block text-xs font-semibold text-gray-500 mb-1">Full Name *</label><input required className={INPUT} placeholder="Dr. Ahmad Ali" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
               <div><label className="block text-xs font-semibold text-gray-500 mb-1">Email *</label><input required type="email" className={INPUT} placeholder="ahmad@college.edu" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
               <div><label className="block text-xs font-semibold text-gray-500 mb-1">Password *</label><input required type="password" className={INPUT} placeholder="Min 6 characters" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
+              <div><label className="block text-xs font-semibold text-gray-500 mb-1">Faculty Type *</label>
+                <select className={INPUT} value={form.educationLevel} onChange={e => setForm(f => ({ ...f, educationLevel: e.target.value }))}>
+                  <option value="BS">🎓 BS Faculty</option>
+                  <option value="INTERMEDIATE">🏫 Inter Faculty</option>
+                  <option value="BOTH">🎓🏫 Both (BS & Inter)</option>
+                </select>
+              </div>
               <div><label className="block text-xs font-semibold text-gray-500 mb-1">Department</label>
                 <select className={INPUT} value={form.departmentId} onChange={e => setForm(f => ({ ...f, departmentId: e.target.value }))}>
                   <option value="">-- Select Department --</option>
@@ -151,12 +169,23 @@ export default function FacultyPage() {
       {editItem && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm space-y-4">
-            <h2 className="text-lg font-bold text-gray-900">Change Department</h2>
+            <h2 className="text-lg font-bold text-gray-900">Edit Faculty Details</h2>
             <p className="text-sm text-gray-500">{editItem.user?.name}</p>
-            <select className={INPUT} value={editDept} onChange={e => setEditDept(e.target.value)}>
-              <option value="">-- No Department --</option>
-              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Faculty Type</label>
+              <select className={INPUT} value={editLevel} onChange={e => setEditLevel(e.target.value)}>
+                <option value="BS">🎓 BS Faculty</option>
+                <option value="INTERMEDIATE">🏫 Inter Faculty</option>
+                <option value="BOTH">🎓🏫 Both (BS & Inter)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Department</label>
+              <select className={INPUT} value={editDept} onChange={e => setEditDept(e.target.value)}>
+                <option value="">-- No Department --</option>
+                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
             <div className="flex gap-3">
               <button onClick={handleUpdate} disabled={saving} className={`flex-1 ${BTN_PRIMARY}`}>{saving ? "Saving..." : "Save"}</button>
               <button onClick={() => setEditItem(null)} className={`flex-1 ${BTN_GRAY}`}>Cancel</button>

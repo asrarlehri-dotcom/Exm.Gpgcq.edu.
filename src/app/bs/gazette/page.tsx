@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getGPValue, calculateStudentCGPA } from "@/lib/cgpa";
+import { useSettings } from "@/lib/useSettings";
 
 type StudentData = {
   id: string;
@@ -18,6 +19,7 @@ type StudentData = {
 };
 
 export default function GazetteCompilerPage() {
+  const { collegeName, collegeLogo, collegeTagline } = useSettings();
   const [students, setStudents] = useState<StudentData[]>([]);
   const [selectedSemester, setSelectedSemester] = useState<number>(1);
   const [loading, setLoading] = useState(true);
@@ -84,7 +86,19 @@ export default function GazetteCompilerPage() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+      {/* Print-only Official Header */}
+      <div className="hidden print:block text-center border-b-2 border-gray-800 pb-4 mb-4 space-y-1">
+        {collegeLogo ? (
+          <img src={collegeLogo} alt="College Logo" className="w-14 h-14 object-contain mx-auto mb-2" />
+        ) : (
+          <div className="text-3xl mb-1">🏛️</div>
+        )}
+        <h1 className="text-2xl font-black text-gray-900 uppercase tracking-wide">{collegeName}</h1>
+        <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">{collegeTagline}</p>
+        <h2 className="text-lg font-bold text-gray-800 uppercase pt-2">Official Results Gazette - Semester {selectedSemester}</h2>
+      </div>
+
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between print:hidden">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Official Results Gazette</h1>
           <p className="text-gray-500 mt-1">

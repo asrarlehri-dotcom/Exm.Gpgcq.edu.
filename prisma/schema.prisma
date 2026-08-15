@@ -44,6 +44,7 @@ model User {
   // Roles: SUPER_ADMIN | BS_CONTROLLER | BS_FACULTY | INTER_FACULTY | PRINCIPAL | STUDENT
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
   
   student   Student?
   faculty   Faculty?
@@ -90,12 +91,17 @@ model Faculty {
   id              String         @id @default(uuid())
   userId          String         @unique
   user            User           @relation(fields: [userId], references: [id])
+  fatherName      String?
+  designation     String?        // e.g. Professor, Associate Professor, Assistant Professor, Lecturer
+  qualification   String?        // e.g. Ph.D, M.Phil, MS, M.Sc
+  contactNumber   String?
   departmentId    String?
   department      Department?    @relation(fields: [departmentId], references: [id])
   educationLevel  String?        // "INTERMEDIATE" | "BS" | null (both)
   isActive        Boolean        @default(true)
   courses         Course[]
   timetables      Timetable[]
+  examDuties      ExamDuty[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -368,6 +374,7 @@ model Timetable {
   
   generationMode  String         @default("MANUAL") // AUTO, MANUAL
   status          String         @default("PUBLISHED") // DRAFT, PUBLISHED, ARCHIVED
+  isFinalized     Boolean        @default(false) // FINALIZED = ready for datesheet generation
   
   courseId        String?
   course          Course?        @relation(fields: [courseId], references: [id])
@@ -405,6 +412,9 @@ model Course {
   title           String
   code            String
   creditHours     Int
+  creditHoursFormat String?      // e.g. "4(3-1)", "4(4-0)", "3(3-0)", "2(2-0)"
+  theoryHours     Int?           @default(3)
+  labHours        Int?           @default(0)
   courseType      String         @default("THEORY") // THEORY, PRACTICAL
   session         String         @default("2022")
   semester        Int
@@ -414,6 +424,8 @@ model Course {
   department      Department?    @relation(fields: [departmentId], references: [id])
   facultyId       String?
   faculty         Faculty?       @relation(fields: [facultyId], references: [id])
+  syllabusJson    String?        // JSON: { description, clos, outlines, assessment, textbooks }
+  syllabusOrder   Int?           @default(0) // Order in semester syllabus sequence
   
   isActive        Boolean        @default(true)
   
@@ -422,6 +434,7 @@ model Course {
   timetables      Timetable[]
   datesheets      Datesheet[]
   attendances     Attendance[]
+  syllabusVersions SyllabusVersion[]
 
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -465,6 +478,7 @@ model Datesheet {
   
   generationMode  String         @default("MANUAL")
   status          String         @default("PUBLISHED")
+  isFinalized     Boolean        @default(false) // FINALIZED = official exam schedule; unlocks Duty + Result
   
   timetableId     String?
   timetable       Timetable?     @relation(fields: [timetableId], references: [id])
@@ -476,9 +490,30 @@ model Datesheet {
   department      Department?    @relation(fields: [departmentId], references: [id])
   
   examId          String?
+  duties          ExamDuty[]
 
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+}
+
+// ─── Exam Duty (Invigilators for each exam paper) ────────────────────────────
+model ExamDuty {
+  id            String    @id @default(uuid())
+  datesheetId   String
+  datesheet     Datesheet @relation(fields: [datesheetId], references: [id], onDelete: Cascade)
+  facultyId     String
+  faculty       Faculty   @relation(fields: [facultyId], references: [id])
+  // dutyType: MANDATORY (owns the course), INVIGILATOR (other), SUPERINTENDENT
+  dutyType      String    @default("INVIGILATOR")
+  isMandatory   Boolean   @default(false) // true = faculty teaches this course
+  room          String?
+  shiftTime     String?   // e.g. "09:00-12:00"
+  notes         String?
+  isOverride    Boolean   @default(false) // true = manually overridden (conflict warned)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([datesheetId, facultyId])
 }
 
 model Marks {
@@ -491,10 +526,12 @@ model Marks {
   
   assignmentMarks Float?         @default(0)
   quizMarks       Float?         @default(0)
+  practicalMarks  Float?         @default(0)
   midtermMarks    Float?         @default(0)
   finalMarks      Float?         @default(0)
   obtainedMarks   Float          @default(0)
   totalMarks      Float          @default(100)
+  status          String?        @default("SAVED")
   isLocked        Boolean        @default(false)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -528,4 +565,25 @@ model AuditLog {
   description     String
   ipAddress       String?
   createdAt       DateTime       @default(now())
+}
+
+model AcademicSession {
+  id        String   @id @default(uuid())
+  name      String   @unique // e.g., "Fall 2026"
+  startDate DateTime
+  endDate   DateTime
+  status    String   @default("ACTIVE") // ACTIVE, CLOSED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SyllabusVersion {
+  id            String   @id @default(uuid())
+  courseId      String
+  course        Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  version       Int
+  contentJson   String
+  isArchived    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

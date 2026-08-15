@@ -131,10 +131,16 @@ export default function PrintChallanPage() {
               </div>
 
               {/* Logo & title */}
-              <div className="flex items-center gap-1.5 justify-center mb-1">
-                <span className="text-2xl">🏛️</span>
+              <div className="flex items-center gap-1.5 justify-center mb-1 text-center">
+                {settings.COLLEGE_LOGO ? (
+                  <img src={settings.COLLEGE_LOGO} alt="College Logo" className="w-6 h-6 object-contain" />
+                ) : (
+                  <span className="text-xl">🏛️</span>
+                )}
                 <div className="text-left leading-none">
-                  <div className="font-extrabold text-[9px] text-gray-900 uppercase">College Management</div>
+                  <div className="font-extrabold text-[8.5px] text-gray-900 uppercase tracking-tight">
+                    {settings.COLLEGE_NAME || "Government Post Graduate College Quetta"}
+                  </div>
                   <div className="text-[7px] text-gray-400">Computer Generated Challan</div>
                 </div>
               </div>

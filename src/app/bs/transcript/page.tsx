@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getGPValue, calculateStudentCGPA } from "@/lib/cgpa";
+import { useSettings } from "@/lib/useSettings";
 
 type StudentData = {
   id: string;
@@ -18,6 +19,7 @@ type StudentData = {
 };
 
 export default function TranscriptGeneratorPage() {
+  const { collegeName, collegeLogo, collegeTagline } = useSettings();
   const [students, setStudents] = useState<StudentData[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -118,9 +120,15 @@ export default function TranscriptGeneratorPage() {
 
       {selectedStudent && (
         <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-200 space-y-6 print:border-none print:shadow-none print:p-0">
-          <div className="text-center border-b-2 pb-4">
-            <h2 className="text-2xl font-black text-gray-900 uppercase">Official Transcript of Record</h2>
-            <p className="text-sm font-bold text-blue-600 uppercase tracking-widest mt-1">College of Higher Education</p>
+          <div className="text-center border-b-2 pb-4 space-y-1">
+            {collegeLogo ? (
+              <img src={collegeLogo} alt="College Logo" className="w-16 h-16 object-contain mx-auto mb-2" />
+            ) : (
+              <div className="text-3xl mb-1">🏛️</div>
+            )}
+            <h2 className="text-2xl font-black text-gray-900 uppercase tracking-wide">{collegeName}</h2>
+            <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">{collegeTagline}</p>
+            <p className="text-sm font-bold text-gray-800 uppercase pt-1">Official Transcript of Record</p>
           </div>
 
           {/* Metadata */}

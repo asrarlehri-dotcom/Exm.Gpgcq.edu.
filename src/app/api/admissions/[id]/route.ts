@@ -355,13 +355,27 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       return NextResponse.json({ error: "Admission not found" }, { status: 404 });
     }
 
-    await prisma.admission.delete({
-      where: { id }
+    await prisma.admission.update({
+      where: { id },
+      data: { status: "CANCELLED" }
+    });
+
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        userId: (session.user as any)?.id,
+        userEmail: session.user?.email,
+        userName: session.user?.name,
+        action: "UPDATE",
+        entity: "Admission",
+        entityId: id,
+        description: `Admission cancelled`,
+      },
     });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting admission:", error);
+    console.error("Error cancelling admission:", error);
     return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }

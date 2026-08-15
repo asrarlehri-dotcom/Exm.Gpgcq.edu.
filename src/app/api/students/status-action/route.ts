@@ -10,39 +10,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { studentId, statusType, reason } = await req.json();
+    const { studentId, statusType, reason, notes, relievingNo } = await req.json();
 
     if (!studentId || !statusType) {
-      return NextResponse.json({ error: "Fields missing" }, { status: 400 });
+      return NextResponse.json({ error: "Student ID and Status Type are required" }, { status: 400 });
     }
 
-    // Log the status
+    // 1. Create StudentStatus record
     const statusRecord = await prisma.studentStatus.create({
       data: {
         studentId,
         statusType,
-        reason,
-        approvedBy: session.user?.name || "Staff",
+        reason: reason || null,
+        notes: notes || (relievingNo ? `NOC / Relieving Cert No: ${relievingNo}` : null),
+        approvedBy: session.user?.name || session.user?.email || "Admin",
       },
     });
 
-    // If student quits or migrates out, set active status to false
-    if (statusType === "QUIT" || statusType === "MIGRATION") {
-      await prisma.student.update({
-        where: { id: studentId },
-        data: { isActive: false },
-      });
-    } else if (statusType === "FREEZE") {
-      // Freezing semester could keep active status true or false depending on policy
-      // Usually, they are not currently taking classes
-      await prisma.student.update({
-        where: { id: studentId },
-        data: { isActive: false },
-      });
-    }
+    // 2. Update Student model activity status
+    const shouldDeactivate = ["FREEZE", "QUIT", "ADP", "DROPOUT", "MIGRATION_OUT"].includes(statusType.toUpperCase());
+    
+    await prisma.student.update({
+      where: { id: studentId },
+      data: {
+        isActive: !shouldDeactivate,
+      },
+    });
+
+    // 3. Audit Log
+    await prisma.auditLog.create({
+      data: {
+        userEmail: session.user?.email,
+        userName: session.user?.name,
+        action: "STATUS_CHANGE",
+        entity: "Student",
+        entityId: studentId,
+        description: `Student status updated to ${statusType} (${reason || 'No reason specified'})`,
+      },
+    });
 
     return NextResponse.json({ success: true, statusRecord });
-  } catch (err) {
-    return NextResponse.json({ error: "Operation failed" }, { status: 500 });
+  } catch (error: any) {
+    console.error("Status action error:", error);
+    return NextResponse.json({ error: error.message || "Failed to update status" }, { status: 500 });
   }
 }

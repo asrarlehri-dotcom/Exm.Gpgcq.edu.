@@ -1,8 +1,8 @@
-import { withAuth } from "next-auth/middleware";
+import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 // Route prefix → allowed roles (empty array = all authenticated users)
-// SUPER_ADMIN always passes every check
 const ROUTE_ROLES: Record<string, string[]> = {
   "/admin":                 ["SUPER_ADMIN"],
   "/intermediate":          ["SUPER_ADMIN", "INTER_FACULTY", "PRINCIPAL"],
@@ -12,46 +12,41 @@ const ROUTE_ROLES: Record<string, string[]> = {
   "/dashboard":             [], // all authenticated
 };
 
-export default withAuth(
-  function middleware(req) {
-    const token   = req.nextauth.token;
-    const path    = req.nextUrl.pathname;
+export async function middleware(req: NextRequest) {
+  const path = req.nextUrl.pathname;
+  const protectedPrefixes = ["/admin", "/intermediate", "/bs", "/faculty", "/student", "/dashboard"];
+  const isProtected = protectedPrefixes.some((p) => path.startsWith(p));
 
-    if (!token) {
-      return NextResponse.redirect(new URL("/login", req.url));
-    }
-
-    const userRole = token.role as string;
-
-    // Super admin has unrestricted access
-    if (userRole === "SUPER_ADMIN") return NextResponse.next();
-
-    // Check route restrictions
-    for (const [route, allowedRoles] of Object.entries(ROUTE_ROLES)) {
-      if (path.startsWith(route)) {
-        if (allowedRoles.length === 0) return NextResponse.next(); // any authenticated
-        if (!allowedRoles.includes(userRole)) {
-          return NextResponse.redirect(new URL("/unauthorized", req.url));
-        }
-        return NextResponse.next();
-      }
-    }
-
+  if (!isProtected) {
     return NextResponse.next();
-  },
-  {
-    callbacks: {
-      // Only require token for protected routes (public pages bypass this)
-      authorized: ({ token, req }) => {
-        const path = req.nextUrl.pathname;
-        const protectedPrefixes = ["/admin", "/intermediate", "/bs", "/faculty", "/student", "/dashboard"];
-        const isProtected = protectedPrefixes.some(p => path.startsWith(p));
-        if (!isProtected) return true; // public route
-        return !!token;
-      },
-    },
   }
-);
+
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+
+  if (!token) {
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("callbackUrl", path);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const userRole = (token.role as string) || "";
+
+  // Super admin has unrestricted access
+  if (userRole === "SUPER_ADMIN") return NextResponse.next();
+
+  // Check route restrictions
+  for (const [route, allowedRoles] of Object.entries(ROUTE_ROLES)) {
+    if (path.startsWith(route)) {
+      if (allowedRoles.length === 0) return NextResponse.next();
+      if (!allowedRoles.includes(userRole)) {
+        return NextResponse.redirect(new URL("/unauthorized", req.url));
+      }
+      return NextResponse.next();
+    }
+  }
+
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [

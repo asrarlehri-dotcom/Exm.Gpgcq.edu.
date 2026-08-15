@@ -25,13 +25,13 @@ export default function InterTimetableDatesheetPage() {
   const [sessions, setSessions] = useState<string[]>([]);
 
   // ── TIMETABLE filters (Level is fixed to INTERMEDIATE)
-  const [tSession, setTSession] = useState("2026");
+  const [tSession, setTSession] = useState("2024");
   const [tProgramId, setTProgramId] = useState("");
   const [tDepartmentId, setTDepartmentId] = useState("");
   const [timetables, setTimetables] = useState<any[]>([]);
 
   // ── DATESHEET filters
-  const [dSession, setDSession] = useState("2026");
+  const [dSession, setDSession] = useState("2024");
   const [dProgramId, setDProgramId] = useState("");
   const [dDepartmentId, setDDepartmentId] = useState("");
   const [dSemester, setDSemester] = useState("1");
@@ -58,7 +58,12 @@ export default function InterTimetableDatesheetPage() {
       .then(res => res.json())
       .then(data => {
         if (data.ACADEMIC_SESSIONS) {
-          setSessions(data.ACADEMIC_SESSIONS.split(",").map((s: string) => s.trim()).filter(Boolean));
+          const list = data.ACADEMIC_SESSIONS.split(",").map((s: string) => s.trim()).filter(Boolean);
+          setSessions(list);
+          if (list.includes("2024")) {
+            setTSession("2024");
+            setDSession("2024");
+          }
         } else {
           setSessions(["2022", "2023", "2024", "2025", "2026", "2027"]);
         }
@@ -70,7 +75,7 @@ export default function InterTimetableDatesheetPage() {
   const loadTimetable = async () => {
     setLoading(true);
     const data = await getTimetables(
-      tSession || undefined,
+      undefined,
       tProgramId || undefined,
       undefined,
       tDepartmentId || undefined
@@ -190,6 +195,7 @@ export default function InterTimetableDatesheetPage() {
                     onChange={(e) => setTProgramId(e.target.value)}
                     className={SELECT_CLS}
                   >
+                    <option value="ALL">-- All Programs --</option>
                     {allPrograms.map((p) => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
@@ -202,6 +208,7 @@ export default function InterTimetableDatesheetPage() {
                     onChange={(e) => setTSession(e.target.value)}
                     className={SELECT_CLS}
                   >
+                    <option value="ALL">-- All Sessions --</option>
                     {sessions.map((y) => (
                       <option key={y} value={y}>{y}</option>
                     ))}
@@ -214,7 +221,7 @@ export default function InterTimetableDatesheetPage() {
                     onChange={(e) => setTDepartmentId(e.target.value)}
                     className={SELECT_CLS}
                   >
-                    <option value="">-- All Departments --</option>
+                    <option value="ALL">-- All Departments --</option>
                     {departments.map((d) => (
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}

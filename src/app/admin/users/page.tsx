@@ -177,7 +177,7 @@ export default function UsersPage() {
                           onClick={() => handleDelete(u)}
                           className="text-red-500 hover:underline text-xs font-medium"
                         >
-                          Delete
+                          Deactivate
                         </button>
                       </div>
                     </td>

@@ -38,6 +38,14 @@ export default async function PrintAdmissionPage({ params }: { params: Promise<{
     // Ignore parse error
   }
 
+  const settingsRows = await prisma.systemSetting.findMany();
+  const settingsMap = settingsRows.reduce<Record<string, string>>((acc, s) => {
+    acc[s.key] = s.value;
+    return acc;
+  }, {});
+  const collegeName = settingsMap.COLLEGE_NAME || "Government Post Graduate College Quetta";
+  const collegeLogo = settingsMap.COLLEGE_LOGO || "";
+
   return (
     <div className="min-h-screen bg-gray-100 p-4 print:p-0 print:bg-white flex flex-col items-center">
       <style>{`@media print { @page { size: portrait; margin: 10mm; } }`}</style>
@@ -62,10 +70,14 @@ export default async function PrintAdmissionPage({ params }: { params: Promise<{
         {/* Header */}
         <div className="flex items-start justify-between border-b-2 border-gray-800 pb-4 mb-6">
           <div className="flex items-center gap-3">
-            <span className="text-4xl mt-1">🏛️</span>
+            {collegeLogo ? (
+              <img src={collegeLogo} alt="Logo" className="w-12 h-12 object-contain" />
+            ) : (
+              <span className="text-4xl mt-1">🏛️</span>
+            )}
             <div>
-              <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">College Management</h1>
-              <p className="text-sm font-semibold text-gray-600 tracking-wider">Admission Application Form</p>
+              <h1 className="text-xl font-black uppercase tracking-wide text-gray-900">{collegeName}</h1>
+              <p className="text-xs font-bold text-blue-600 tracking-wider uppercase">Admission Application Form</p>
             </div>
           </div>
           <div className="flex items-center gap-6">

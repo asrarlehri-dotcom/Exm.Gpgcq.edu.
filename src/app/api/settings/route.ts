@@ -4,12 +4,21 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
 const DEFAULT_SETTINGS = [
+  { key: "COLLEGE_NAME", value: "Government Post Graduate College Quetta" },
+  { key: "COLLEGE_LOGO", value: "" },
+  { key: "COLLEGE_TAGLINE", value: "College of Higher Education & Research" },
+  { key: "COLLEGE_ADDRESS", value: "Quetta, Balochistan, Pakistan" },
   { key: "CHALLAN_BANK_ACCOUNT", value: "08730001324203" },
+  { key: "CHALLAN_BANK_NAME", value: "Habib Bank Limited (HBL)" },
+  { key: "CHALLAN_BRANCH_CODE", value: "0873" },
+  { key: "CHALLAN_ACCOUNT_TITLE", value: "Principal Govt College" },
   { key: "CHALLAN_SEQUENCE_START", value: "100000" },
   { key: "CHALLAN_SEQUENCE_CURRENT", value: "135622565" },
   { key: "ROLL_NUMBER_PATTERN", value: "[YEAR]-[CODE]-[SEQ]" },
   { key: "ROLL_SEQUENCE_CURRENT", value: "1" },
   { key: "ACADEMIC_SESSIONS", value: "2022,2023,2024,2025,2026,2027" },
+  { key: "DEFAULT_FACULTY_PASSWORD", value: "gpgcq123" },
+  { key: "FACULTY_EMAIL_DOMAIN", value: "@gpgcquetta.edu.pk" },
 ];
 
 export async function GET() {

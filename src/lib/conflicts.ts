@@ -26,26 +26,35 @@ export async function checkTimetableConflicts({
   };
 
   // 1. Faculty Conflict: Same Faculty + Same Day + Overlapping Time
-  const facultyTimetables = await prisma.timetable.findMany({
-    where: { facultyId, dayOfWeek, id: { not: excludeTimetableId } }
-  });
-  
-  for (const t of facultyTimetables) {
-    if (checkOverlap(startTime, endTime, t.startTime, t.endTime)) {
-      errors.push(`Faculty Conflict: Faculty is already assigned to a class from ${t.startTime} to ${t.endTime} on ${dayOfWeek}.`);
-      break;
+  if (facultyId) {
+    const facultyTimetables = await prisma.timetable.findMany({
+      where: { facultyId, dayOfWeek, ...(excludeTimetableId ? { id: { not: excludeTimetableId } } : {}) },
+      include: { course: true, program: true, faculty: { include: { user: true } } }
+    });
+    
+    for (const t of facultyTimetables) {
+      if (checkOverlap(startTime, endTime, t.startTime, t.endTime)) {
+        const facName = t.faculty?.user?.name || "This faculty";
+        const courseName = t.course?.title || "another course";
+        errors.push(`Faculty Conflict: ${facName} is already assigned to "${courseName}" (${t.program?.code || 'Class'} Sem ${t.semester}) from ${t.startTime} to ${t.endTime} on ${dayOfWeek}.`);
+        break;
+      }
     }
   }
 
   // 2. Semester Conflict: Same Semester + Same Program + Same Day + Overlapping Time
-  const semesterTimetables = await prisma.timetable.findMany({
-    where: { programId, semester, dayOfWeek, id: { not: excludeTimetableId } }
-  });
+  if (programId && semester) {
+    const semesterTimetables = await prisma.timetable.findMany({
+      where: { programId, semester, dayOfWeek, ...(excludeTimetableId ? { id: { not: excludeTimetableId } } : {}) },
+      include: { course: true }
+    });
 
-  for (const t of semesterTimetables) {
-    if (checkOverlap(startTime, endTime, t.startTime, t.endTime)) {
-      errors.push(`Semester Conflict: Semester ${semester} already has a class scheduled from ${t.startTime} to ${t.endTime} on ${dayOfWeek}.`);
-      break;
+    for (const t of semesterTimetables) {
+      if (checkOverlap(startTime, endTime, t.startTime, t.endTime)) {
+        const courseName = t.course?.title || "another course";
+        errors.push(`Semester Conflict: Semester ${semester} already has "${courseName}" scheduled from ${t.startTime} to ${t.endTime} on ${dayOfWeek}.`);
+        break;
+      }
     }
   }
 

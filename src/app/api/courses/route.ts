@@ -3,6 +3,43 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
+export function parseCreditHoursHelper(input: any, theoryInput?: any, labInput?: any, courseType?: string) {
+  const str = String(input || "").trim();
+  const match = str.match(/^(\d+)\s*\(\s*(\d+)\s*[\-\/]\s*(\d+)\s*\)$/);
+  if (match) {
+    const total = parseInt(match[1]);
+    const theory = parseInt(match[2]);
+    const lab = parseInt(match[3]);
+    return {
+      total,
+      theory,
+      lab,
+      format: `${total}(${theory}-${lab})`
+    };
+  }
+
+  const total = parseInt(str) || 3;
+  let theory = theoryInput !== undefined && theoryInput !== null && theoryInput !== "" ? parseInt(String(theoryInput)) : NaN;
+  let lab = labInput !== undefined && labInput !== null && labInput !== "" ? parseInt(String(labInput)) : NaN;
+
+  if (isNaN(theory) || isNaN(lab)) {
+    if (courseType === "LAB_PRACTICAL" || courseType === "PRACTICAL") {
+      lab = 1;
+      theory = Math.max(0, total - lab);
+    } else {
+      lab = 0;
+      theory = total;
+    }
+  }
+
+  return {
+    total,
+    theory,
+    lab,
+    format: `${total}(${theory}-${lab})`
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -33,15 +70,23 @@ export async function POST(req: NextRequest) {
     if (!session || !["SUPER_ADMIN", "ADMIN"].includes((session.user as any)?.role))
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { title, code, creditHours, courseType, session: sess, semester, programId, departmentId, facultyId } = await req.json();
+    const body = await req.json();
+    const { title, code, creditHours, creditHoursFormat, theoryHours, labHours, courseType, session: sess, semester, programId, departmentId, facultyId } = body;
 
     if (!title || !code || !creditHours || !semester || !programId)
       return NextResponse.json({ error: "Required fields missing" }, { status: 400 });
 
+    const parsedCredits = parseCreditHoursHelper(creditHoursFormat || creditHours, theoryHours, labHours, courseType);
+
     const course = await prisma.course.create({
       data: {
-        title, code, creditHours: parseInt(creditHours),
-        courseType: courseType || "THEORY",
+        title,
+        code,
+        creditHours: parsedCredits.total,
+        creditHoursFormat: parsedCredits.format,
+        theoryHours: parsedCredits.theory,
+        labHours: parsedCredits.lab,
+        courseType: courseType || (parsedCredits.lab > 0 ? "LAB_PRACTICAL" : "THEORY"),
         session: sess || "2026",
         semester: parseInt(semester),
         programId,
@@ -55,12 +100,13 @@ export async function POST(req: NextRequest) {
       data: {
         userEmail: session.user?.email, userName: session.user?.name,
         action: "CREATE", entity: "Course", entityId: course.id,
-        description: `Course "${title}" (${code}) created for Semester ${semester}`,
+        description: `Course "${title}" (${code}) created with ${parsedCredits.format} credits for Semester ${semester}`,
       },
     });
 
     return NextResponse.json(course, { status: 201 });
-  } catch {
+  } catch (error: any) {
+    console.error("Course create error:", error);
     return NextResponse.json({ error: "Failed to create course" }, { status: 500 });
   }
 }

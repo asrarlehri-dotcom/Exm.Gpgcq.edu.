@@ -151,10 +151,24 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Locked fee configurations cannot be deleted." }, { status: 400 });
     }
 
-    await prisma.feeSettings.delete({ where: { id } });
+    await prisma.feeSettings.update({ where: { id }, data: { isActive: false } });
+    
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        userId: (session.user as any)?.id,
+        userEmail: session.user?.email,
+        userName: session.user?.name,
+        action: "DEACTIVATE",
+        entity: "FeeSettings",
+        entityId: id,
+        description: `Fee setting deactivated`,
+      },
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting fee setting override:", error);
+    console.error("Error deactivating fee setting override:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

@@ -7,17 +7,43 @@ import bcrypt from "bcryptjs";
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !["SUPER_ADMIN", "ADMIN"].includes((session.user as any)?.role))
+    if (
+      !session ||
+      !["SUPER_ADMIN", "ADMIN", "FACULTY", "BS_FACULTY", "INTER_FACULTY", "TEACHER", "BS_CONTROLLER"].includes(
+        (session.user as any)?.role
+      )
+    )
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
     const educationLevel = searchParams.get("educationLevel") || undefined;
     const programId = searchParams.get("programId") || undefined;
+    const sessionParam = searchParams.get("session") || undefined;
+    const courseId = searchParams.get("courseId") || undefined; // New: filter by enrollment
 
+    // ── Enrollment-based filtering ───────────────────────────────────────────
+    // When courseId is provided, return ONLY students enrolled in that course.
+    // This is used by the marks entry page to show the correct student list.
+    if (courseId) {
+      const enrollments = await prisma.enrollment.findMany({
+        where: { courseId, status: "ACTIVE" },
+        include: {
+          student: {
+            include: { user: true, program: true, group: true, statuses: true },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+      const students = enrollments.map((e) => e.student);
+      return NextResponse.json(students);
+    }
+
+    // ── Standard filter (no courseId) ────────────────────────────────────────
     const students = await prisma.student.findMany({
       where: {
         ...(educationLevel && { educationLevel }),
         ...(programId && { programId }),
+        ...(sessionParam && { session: sessionParam }),
       },
       include: { user: true, program: true, group: true, statuses: true },
       orderBy: { createdAt: "desc" },

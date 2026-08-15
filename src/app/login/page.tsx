@@ -1,14 +1,30 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    if (errorParam) {
+      if (errorParam === "CredentialsSignin") {
+        setError("Invalid email or password.");
+      } else if (errorParam === "AccessDenied") {
+        setError("Access denied. You do not have permission to access this resource.");
+      } else if (errorParam === "Configuration") {
+        setError("Server configuration error. Please contact admin.");
+      } else {
+        setError("An authentication error occurred. Please try again.");
+      }
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +52,7 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div className="p-3 text-sm text-red-500 bg-red-50 rounded-lg">
+          <div className="p-3 text-sm text-red-500 bg-red-50 rounded-lg border border-red-200">
             {error}
           </div>
         )}
@@ -73,3 +89,16 @@ export default function LoginPage() {
     </div>
   );
 }
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
+  );
+}
+

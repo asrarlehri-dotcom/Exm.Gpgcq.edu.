@@ -32,7 +32,7 @@ type ChallanStatus = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  PENDING:  "bg-yellow-100 text-yellow-800",
+  PENDING: "bg-yellow-100 text-yellow-800",
   APPROVED: "bg-green-100  text-green-800",
   REJECTED: "bg-red-100    text-red-800",
 };
@@ -41,11 +41,11 @@ export default function BsAdmissionsPage() {
   const { can } = usePermissions();
   const [admissions, setAdmissions] = useState<Admission[]>([]);
   const [challanMap, setChallanMap] = useState<Record<string, ChallanStatus>>({});
-  const [programs, setPrograms]       = useState<any[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState("");
-  const [filter, setFilter]         = useState("ALL");
-  const [msg, setMsg]               = useState({ type: "", text: "" });
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("ALL");
+  const [msg, setMsg] = useState({ type: "", text: "" });
 
   // Edit form states
   const [editingAdmission, setEditingAdmission] = useState<Admission | null>(null);
@@ -62,7 +62,7 @@ export default function BsAdmissionsPage() {
   });
   const [updating, setUpdating] = useState(false);
 
-  const canAdd     = can(MODULES.BS_ADMISSIONS, ACTIONS.ADD);
+  const canAdd = can(MODULES.BS_ADMISSIONS, ACTIONS.ADD);
   const canApprove = can(MODULES.BS_ADMISSIONS, ACTIONS.APPROVE);
 
   useEffect(() => {
@@ -178,7 +178,7 @@ export default function BsAdmissionsPage() {
         return;
       }
       const headers = lines[0].split(",").map(h => h.trim().replace(/^["']|["']$/g, ""));
-      
+
       const parsedAdmissions = [];
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(",").map(v => v.trim().replace(/^["']|["']$/g, ""));
@@ -188,7 +188,7 @@ export default function BsAdmissionsPage() {
         });
         parsedAdmissions.push(row);
       }
-      
+
       let successCount = 0;
       let failCount = 0;
       for (const item of parsedAdmissions) {
@@ -207,7 +207,7 @@ export default function BsAdmissionsPage() {
           session: item.session || "2026-2030",
           gender: item.gender || "MALE"
         };
-        
+
         try {
           const res = await fetch("/api/admissions", {
             method: "POST",
@@ -241,10 +241,10 @@ export default function BsAdmissionsPage() {
       challanMap[a.cnic]?.challanNumber || "N/A",
       challanMap[a.cnic]?.status || "N/A"
     ]);
-    
-    let csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+
+    let csvContent = "data:text/csv;charset=utf-8,\uFEFF"
       + [headers.join(","), ...rows.map(e => e.map(val => `"${val}"`).join(","))].join("\n");
-      
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -270,7 +270,8 @@ export default function BsAdmissionsPage() {
   return (
     <div className="space-y-6">
       {/* Print Page adjustments */}
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @media print {
           aside, .sidebar, .print-hide, .no-print, button, label, input, select, header {
             display: none !important;
@@ -320,11 +321,10 @@ export default function BsAdmissionsPage() {
 
       {/* Alert message */}
       {msg.text && (
-        <div className={`p-4 rounded-lg text-sm font-medium ${
-          msg.type === "success"
-            ? "bg-green-50 text-green-700 border border-green-200"
-            : "bg-red-50 text-red-700 border border-red-200"
-        }`}>
+        <div className={`p-4 rounded-lg text-sm font-medium ${msg.type === "success"
+          ? "bg-green-50 text-green-700 border border-green-200"
+          : "bg-red-50 text-red-700 border border-red-200"
+          }`}>
           {msg.text}
         </div>
       )}
@@ -342,11 +342,10 @@ export default function BsAdmissionsPage() {
           <button
             key={s}
             onClick={() => setFilter(s)}
-            className={`px-4 py-2 text-sm rounded-lg font-medium transition-colors ${
-              filter === s
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
+            className={`px-4 py-2 text-sm rounded-lg font-medium transition-colors ${filter === s
+              ? "bg-blue-600 text-white"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
           >
             {s}
           </button>
@@ -403,13 +402,12 @@ export default function BsAdmissionsPage() {
                           className="hover:opacity-80 block cursor-pointer"
                           title="Click to print challan"
                         >
-                          <span className={`px-2 py-1 text-xs font-bold rounded-full border ${
-                            challanMap[a.cnic].status === "PAID"     ? "bg-green-100 text-green-800 border-green-200" :
+                          <span className={`px-2 py-1 text-xs font-bold rounded-full border ${challanMap[a.cnic].status === "PAID" ? "bg-green-100 text-green-800 border-green-200" :
                             challanMap[a.cnic].status === "REJECTED" ? "bg-red-100 text-red-800 border-red-200" :
-                            "bg-yellow-100 text-yellow-800 border-yellow-200"
-                          }`}>
+                              "bg-yellow-100 text-yellow-800 border-yellow-200"
+                            }`}>
                             {challanMap[a.cnic].status === "PAID" ? "💚 Paid" :
-                             challanMap[a.cnic].status === "REJECTED" ? "❌ Rejected" : "⏳ Pending"}
+                              challanMap[a.cnic].status === "REJECTED" ? "❌ Rejected" : "⏳ Pending"}
                           </span>
                           <div className="text-[10px] text-blue-600 underline mt-0.5">{challanMap[a.cnic].challanNumber}</div>
                           {challanMap[a.cnic].status === "PAID" && challanMap[a.cnic].paidId && (
@@ -428,8 +426,8 @@ export default function BsAdmissionsPage() {
                           {a.bsAdmissionType === "BRIDGING_5TH"
                             ? "5th Sem / Bridging"
                             : a.bsAdmissionType === "MIGRATION"
-                            ? `Migration → Sem ${a.migrationSemester ?? "?"}`
-                            : "Regular"}
+                              ? `Migration → Sem ${a.migrationSemester ?? "?"}`
+                              : "Regular"}
                         </span>
                       ) : "—"}
                     </td>
@@ -499,7 +497,7 @@ export default function BsAdmissionsPage() {
           <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-gray-900">Update Admission & Student Profile</h2>
             <p className="text-xs text-gray-500">Update details for CNIC: {editForm.cnic}</p>
-            
+
             <form onSubmit={handleSaveEdit} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -578,7 +576,7 @@ export default function BsAdmissionsPage() {
                       value={editForm.migrationSemester}
                       onChange={e => setEditForm(f => ({ ...f, migrationSemester: e.target.value }))}
                     >
-                      {[1,2,3,4,5,6,7,8].map(s => (
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
                         <option key={s} value={String(s)}>Semester {s}</option>
                       ))}
                     </select>
