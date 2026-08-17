@@ -8,13 +8,13 @@ export default function ExamsResultsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 print:hidden">
         <h1 className="text-2xl font-bold text-gray-900">Examinations & Results</h1>
         <p className="text-gray-500 mt-1">Manage Marks Entry, Result Compilation, and Student Promotions.</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="flex border-b">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:border-none print:shadow-none">
+        <div className="flex border-b print:hidden">
           <button
             className={`px-6 py-4 font-medium text-sm ${activeTab === 'marks' ? 'border-b-2 border-blue-600 text-blue-600 font-bold' : 'text-gray-500 hover:text-gray-700'}`}
             onClick={() => setActiveTab('marks')}
@@ -1183,26 +1183,62 @@ function MeritScholarshipsTab() {
     .filter(s => viewAll || (s.session === sessionFilter && s.program === programFilter && s.currentSemester === semesterFilter))
     .sort((a, b) => b.totalCgpa - a.totalCgpa);
 
+  const handleExportCSV = () => {
+    const headers = [
+      "S.No", "Roll No", "Name", "CNIC", "Contact No", "Department/Program", "Session", "Current Semester",
+      "GPA 1", "GPA 2", "GPA 3", "GPA 4", "GPA 5", "GPA 6", "GPA 7", "GPA 8", "Current CGPA", "Total CGPA"
+    ];
+    const csvContent = [
+      headers.join(","),
+      ...filteredStudents.map((s, idx) => [
+        idx + 1, s.roll, `"${s.name}"`, s.cnic, s.contact, `"${s.program}"`, `"${s.session}"`, s.currentSemester,
+        s.gpa1 || "", s.gpa2 || "", s.gpa3 || "", s.gpa4 || "", s.gpa5 || "", s.gpa6 || "", s.gpa7 || "", s.gpa8 || "",
+        s.currentCgpa.toFixed(2), s.totalCgpa.toFixed(2)
+      ].join(","))
+    ].join("\n");
+    
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "merit_scholarships_list.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:m-0 print:space-y-0">
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 10mm; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white !important; }
+        }
+      `}</style>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Merit & Scholarships List</h2>
-          <p className="text-gray-500 text-sm">Generate lists of top performers eligible for scholarships or honors.</p>
+          <p className="text-gray-500 text-sm print:hidden">Generate lists of top performers eligible for scholarships or honors.</p>
         </div>
-        <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 border border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg text-sm font-medium transition-colors">
+        <div className="flex gap-3 print:hidden">
+          <button 
+            onClick={() => window.print()}
+            className="flex items-center gap-2 px-4 py-2 border border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg text-sm font-medium transition-colors"
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
             Print / Save as PDF
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 border border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg text-sm font-medium transition-colors">
+          <button 
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-4 py-2 border border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg text-sm font-medium transition-colors"
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
             Export CSV
           </button>
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200 items-end">
+      <div className="flex flex-col sm:flex-row gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200 items-end print:hidden">
         <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm h-full">
           <label className="text-sm font-semibold text-gray-700">Minimum CGPA:</label>
           <select
@@ -1268,32 +1304,32 @@ function MeritScholarshipsTab() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 table-auto">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm print:border-none print:shadow-none">
+        <div className="overflow-x-auto print:overflow-visible">
+          <table className="min-w-full divide-y divide-gray-200 table-auto print:w-full">
             <thead className="bg-gray-50 whitespace-nowrap">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">S.No</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Roll No</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Name</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">CNIC</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Contact No</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Department/Program</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Session</th>
-                <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Current Semester</th>
-                <th className="px-3 py-3 text-center text-xs font-bold text-gray-500 uppercase">GPA 1</th>
-                <th className="px-3 py-3 text-center text-xs font-bold text-gray-500 uppercase">GPA 2</th>
-                <th className="px-3 py-3 text-center text-xs font-bold text-gray-500 uppercase">GPA 3</th>
-                <th className="px-3 py-3 text-center text-xs font-bold text-gray-500 uppercase">GPA 4</th>
-                <th className="px-3 py-3 text-center text-xs font-bold text-gray-500 uppercase">GPA 5</th>
-                <th className="px-3 py-3 text-center text-xs font-bold text-gray-500 uppercase">GPA 6</th>
-                <th className="px-3 py-3 text-center text-xs font-bold text-gray-500 uppercase">GPA 7</th>
-                <th className="px-3 py-3 text-center text-xs font-bold text-gray-500 uppercase">GPA 8</th>
-                <th className="px-4 py-3 text-center text-xs font-bold text-blue-700 uppercase bg-blue-50">Current CGPA</th>
-                <th className="px-4 py-3 text-center text-xs font-bold text-blue-800 uppercase bg-blue-100">Total CGPA</th>
+                <th className="px-4 py-3 print:px-1.5 print:py-1 text-left text-xs print:text-[8px] font-bold text-gray-500 uppercase">S.No</th>
+                <th className="px-4 py-3 print:px-1.5 print:py-1 text-left text-xs print:text-[8px] font-bold text-gray-500 uppercase">Roll No</th>
+                <th className="px-4 py-3 print:px-1.5 print:py-1 text-left text-xs print:text-[8px] font-bold text-gray-500 uppercase">Name</th>
+                <th className="px-4 py-3 print:px-1.5 print:py-1 text-left text-xs print:text-[8px] font-bold text-gray-500 uppercase">CNIC</th>
+                <th className="px-4 py-3 print:px-1.5 print:py-1 text-left text-xs print:text-[8px] font-bold text-gray-500 uppercase">Contact No</th>
+                <th className="px-4 py-3 print:px-1.5 print:py-1 text-left text-xs print:text-[8px] font-bold text-gray-500 uppercase">Department/Program</th>
+                <th className="px-4 py-3 print:px-1.5 print:py-1 text-left text-xs print:text-[8px] font-bold text-gray-500 uppercase">Session</th>
+                <th className="px-4 py-3 print:px-1.5 print:py-1 text-center text-xs print:text-[8px] font-bold text-gray-500 uppercase">Current Semester</th>
+                <th className="px-3 py-3 print:px-1 print:py-1 text-center text-xs print:text-[8px] font-bold text-gray-500 uppercase">GPA 1</th>
+                <th className="px-3 py-3 print:px-1 print:py-1 text-center text-xs print:text-[8px] font-bold text-gray-500 uppercase">GPA 2</th>
+                <th className="px-3 py-3 print:px-1 print:py-1 text-center text-xs print:text-[8px] font-bold text-gray-500 uppercase">GPA 3</th>
+                <th className="px-3 py-3 print:px-1 print:py-1 text-center text-xs print:text-[8px] font-bold text-gray-500 uppercase">GPA 4</th>
+                <th className="px-3 py-3 print:px-1 print:py-1 text-center text-xs print:text-[8px] font-bold text-gray-500 uppercase">GPA 5</th>
+                <th className="px-3 py-3 print:px-1 print:py-1 text-center text-xs print:text-[8px] font-bold text-gray-500 uppercase">GPA 6</th>
+                <th className="px-3 py-3 print:px-1 print:py-1 text-center text-xs print:text-[8px] font-bold text-gray-500 uppercase">GPA 7</th>
+                <th className="px-3 py-3 print:px-1 print:py-1 text-center text-xs print:text-[8px] font-bold text-gray-500 uppercase">GPA 8</th>
+                <th className="px-4 py-3 print:px-1.5 print:py-1 text-center text-xs print:text-[8px] font-bold text-blue-700 uppercase bg-blue-50">Current CGPA</th>
+                <th className="px-4 py-3 print:px-1.5 print:py-1 text-center text-xs print:text-[8px] font-bold text-blue-800 uppercase bg-blue-100">Total CGPA</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200 text-sm whitespace-nowrap">
+            <tbody className="bg-white divide-y divide-gray-200 text-sm print:text-[9px] whitespace-nowrap print:whitespace-normal">
               {filteredStudents.length === 0 ? (
                 <tr>
                   <td colSpan={18} className="px-6 py-8 text-center text-gray-500">
@@ -1303,24 +1339,24 @@ function MeritScholarshipsTab() {
               ) : (
                 filteredStudents.map((s, index) => (
                   <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{index + 1}</td>
-                    <td className="px-4 py-3 font-semibold text-gray-700">{s.roll}</td>
-                    <td className="px-4 py-3 font-bold text-gray-900">{s.name}</td>
-                    <td className="px-4 py-3 text-gray-600">{s.cnic}</td>
-                    <td className="px-4 py-3 text-gray-600">{s.contact}</td>
-                    <td className="px-4 py-3 text-gray-700">{s.program}</td>
-                    <td className="px-4 py-3 text-gray-700">{s.session}</td>
-                    <td className="px-4 py-3 text-center font-medium text-gray-800">{s.currentSemester}</td>
-                    <td className="px-3 py-3 text-center text-gray-600">{s.gpa1 ? s.gpa1.toFixed(2) : '-'}</td>
-                    <td className="px-3 py-3 text-center text-gray-600">{s.gpa2 ? s.gpa2.toFixed(2) : '-'}</td>
-                    <td className="px-3 py-3 text-center text-gray-600">{s.gpa3 ? s.gpa3.toFixed(2) : '-'}</td>
-                    <td className="px-3 py-3 text-center text-gray-600">{s.gpa4 ? s.gpa4.toFixed(2) : '-'}</td>
-                    <td className="px-3 py-3 text-center text-gray-600">{s.gpa5 ? s.gpa5.toFixed(2) : '-'}</td>
-                    <td className="px-3 py-3 text-center text-gray-600">{s.gpa6 ? s.gpa6.toFixed(2) : '-'}</td>
-                    <td className="px-3 py-3 text-center text-gray-600">{s.gpa7 ? s.gpa7.toFixed(2) : '-'}</td>
-                    <td className="px-3 py-3 text-center text-gray-600">{s.gpa8 ? s.gpa8.toFixed(2) : '-'}</td>
-                    <td className="px-4 py-3 text-center font-bold text-blue-700 bg-blue-50/50">{s.currentCgpa.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-center font-black text-blue-800 bg-blue-100/50">{s.totalCgpa.toFixed(2)}</td>
+                    <td className="px-4 py-3 print:px-1.5 print:py-1 font-medium text-gray-900">{index + 1}</td>
+                    <td className="px-4 py-3 print:px-1.5 print:py-1 font-semibold text-gray-700">{s.roll}</td>
+                    <td className="px-4 py-3 print:px-1.5 print:py-1 font-bold text-gray-900">{s.name}</td>
+                    <td className="px-4 py-3 print:px-1.5 print:py-1 text-gray-600">{s.cnic}</td>
+                    <td className="px-4 py-3 print:px-1.5 print:py-1 text-gray-600">{s.contact}</td>
+                    <td className="px-4 py-3 print:px-1.5 print:py-1 text-gray-700 max-w-[120px] print:max-w-none truncate print:whitespace-normal">{s.program}</td>
+                    <td className="px-4 py-3 print:px-1.5 print:py-1 text-gray-700">{s.session}</td>
+                    <td className="px-4 py-3 print:px-1.5 print:py-1 text-center font-medium text-gray-800">{s.currentSemester}</td>
+                    <td className="px-3 py-3 print:px-1 print:py-1 text-center text-gray-600">{s.gpa1 ? s.gpa1.toFixed(2) : '-'}</td>
+                    <td className="px-3 py-3 print:px-1 print:py-1 text-center text-gray-600">{s.gpa2 ? s.gpa2.toFixed(2) : '-'}</td>
+                    <td className="px-3 py-3 print:px-1 print:py-1 text-center text-gray-600">{s.gpa3 ? s.gpa3.toFixed(2) : '-'}</td>
+                    <td className="px-3 py-3 print:px-1 print:py-1 text-center text-gray-600">{s.gpa4 ? s.gpa4.toFixed(2) : '-'}</td>
+                    <td className="px-3 py-3 print:px-1 print:py-1 text-center text-gray-600">{s.gpa5 ? s.gpa5.toFixed(2) : '-'}</td>
+                    <td className="px-3 py-3 print:px-1 print:py-1 text-center text-gray-600">{s.gpa6 ? s.gpa6.toFixed(2) : '-'}</td>
+                    <td className="px-3 py-3 print:px-1 print:py-1 text-center text-gray-600">{s.gpa7 ? s.gpa7.toFixed(2) : '-'}</td>
+                    <td className="px-3 py-3 print:px-1 print:py-1 text-center text-gray-600">{s.gpa8 ? s.gpa8.toFixed(2) : '-'}</td>
+                    <td className="px-4 py-3 print:px-1.5 print:py-1 text-center font-bold text-blue-700 bg-blue-50/50 print:bg-transparent">{s.currentCgpa.toFixed(2)}</td>
+                    <td className="px-4 py-3 print:px-1.5 print:py-1 text-center font-black text-blue-800 bg-blue-100/50 print:bg-transparent">{s.totalCgpa.toFixed(2)}</td>
                   </tr>
                 ))
               )}

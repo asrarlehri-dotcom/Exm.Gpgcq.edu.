@@ -32,7 +32,7 @@ datasource db {
 //   BS.PROMOTIONS, BS.DMC, BS.TRANSCRIPT,
 //   BS.GAZETTE, BS.STUDENT_ACTIONS, BS.GRADUATION,
 //   ADMIN.USERS, ADMIN.PERMISSIONS, ADMIN.AUDIT_LOGS,
-//   ADMIN.SETTINGS
+//   ADMIN.SETTINGS, ADMIN.EXPENSES
 // ─────────────────────────────────────────────
 
 model User {
@@ -83,6 +83,7 @@ model Department {
   courses   Course[]
   timetables Timetable[]
   datesheets Datesheet[]
+  expenses  Expense[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -131,6 +132,7 @@ model Group {
   name            String         // e.g., Pre-Engineering, Pre-Medical, FA Special
   programId       String
   program         Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  isActive        Boolean        @default(true)
   subjects        Subject[]
   students        Student[]
   admissions      Admission[]
@@ -144,6 +146,7 @@ model Subject {
   code            String?
   groupId         String?
   group           Group?         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -207,6 +210,7 @@ model StudentStatus {
   toDate      DateTime?
   approvedBy  String?
   notes       String?
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -223,6 +227,7 @@ model Promotion {
   promotedBy      String?
   promotedAt      DateTime @default(now())
   notes           String?
+  isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -275,6 +280,7 @@ model Admission {
 
   previousMarksJson String?      // JSON array of previous semester marks: [{"courseId":"...", "obtainedMarks":85, "totalMarks":100}]
 
+  isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   challans        Challan[]
@@ -309,6 +315,7 @@ model Challan {
   studentId      String?
   student        Student?   @relation(fields: [studentId], references: [id])
 
+  isActive       Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
@@ -317,6 +324,7 @@ model SystemSetting {
   id        String   @id @default(uuid())
   key       String   @unique
   value     String
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -350,6 +358,7 @@ model Fee {
   semester        Int?
   educationLevel  String?        // "INTERMEDIATE" or "BS"
   paidAt          DateTime?
+  isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -359,6 +368,7 @@ model ClassSection {
   name            String         // e.g. "A", "B", "Pre-Med 1"
   programId       String
   groupId         String?
+  isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -389,6 +399,7 @@ model Timetable {
   subjectId       String?        // Intermediate
 
   datesheets      Datesheet[]
+  isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -403,6 +414,7 @@ model Attendance {
   courseId        String?        // For BS
   course          Course?        @relation(fields: [courseId], references: [id])
   educationLevel  String?        // "INTERMEDIATE" | "BS"
+  isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -448,6 +460,7 @@ model Enrollment {
   semester        Int
   course          Course         @relation(fields: [courseId], references: [id])
   status          String         @default("ACTIVE") // ACTIVE, DROPPED, REPEATED
+  isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   
@@ -462,6 +475,7 @@ model Exam {
   session         String?
   programId       String?
   isLocked        Boolean        @default(false)
+  isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -492,6 +506,7 @@ model Datesheet {
   examId          String?
   duties          ExamDuty[]
 
+  isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -510,6 +525,7 @@ model ExamDuty {
   shiftTime     String?   // e.g. "09:00-12:00"
   notes         String?
   isOverride    Boolean   @default(false) // true = manually overridden (conflict warned)
+  isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -533,6 +549,7 @@ model Marks {
   totalMarks      Float          @default(100)
   status          String?        @default("SAVED")
   isLocked        Boolean        @default(false)
+  isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   
@@ -550,6 +567,7 @@ model Result {
   isLocked        Boolean        @default(false)
   lockedBy        String?
   lockedAt        DateTime?
+  isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -573,6 +591,7 @@ model AcademicSession {
   startDate DateTime
   endDate   DateTime
   status    String   @default("ACTIVE") // ACTIVE, CLOSED
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -584,6 +603,27 @@ model SyllabusVersion {
   version       Int
   contentJson   String
   isArchived    Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Expense {
+  id            String   @id @default(uuid())
+  category      String   // e.g., "SALARY", "UTILITIES", "MAINTENANCE"
+  date          DateTime
+  description   String
+  amount        Float
+  vendorPayee   String?
+  paymentMethod String   // e.g., "CASH", "BANK_TRANSFER", "CHEQUE"
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  session       String?
+  receipt       String?  // URL or path to receipt file
+  status        String   @default("PAID") // PAID, PENDING, CANCELLED
+  createdBy     String?
+  updatedBy     String?
+  isActive      Boolean  @default(true) // For soft delete
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }

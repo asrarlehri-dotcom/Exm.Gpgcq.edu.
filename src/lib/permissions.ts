@@ -32,6 +32,7 @@ export const MODULES = {
   ADMIN_PERMISSIONS:  "ADMIN.PERMISSIONS",
   ADMIN_AUDIT_LOGS:   "ADMIN.AUDIT_LOGS",
   ADMIN_SETTINGS:     "ADMIN.SETTINGS",
+  ADMIN_EXPENSES:     "ADMIN.EXPENSES",
 } as const;
 
 export type ModuleKey = typeof MODULES[keyof typeof MODULES];

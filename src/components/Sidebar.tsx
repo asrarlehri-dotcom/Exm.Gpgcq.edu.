@@ -121,6 +121,7 @@ export function Sidebar() {
         { key: "fee-management",       href: "/admin/fees",                 label: "Fee Management",        module: MODULES.BS_FEES, icon: CreditCard },
         { key: "challan-management",   href: "/bs/fees",                    label: "Challan Management",    module: MODULES.BS_FEES, icon: Receipt },
         { key: "dues-payments",        href: "/bs/fees",                    label: "Dues & Payments",       module: MODULES.BS_FEES, icon: DollarSign },
+        { key: "expenses",             href: "/admin/expenses",             label: "Expenses",              module: MODULES.ADMIN_EXPENSES, icon: Receipt },
       ],
     },
     {
@@ -135,7 +136,7 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="flex flex-col w-64 bg-[#0A1128] text-slate-100 h-screen border-r border-slate-800/80 select-none shadow-2xl z-30 flex-shrink-0">
+    <aside className="flex flex-col w-64 bg-[#0A1128] text-slate-100 h-screen border-r border-slate-800/80 select-none shadow-2xl z-30 flex-shrink-0 print:hidden">
       {/* Top Header Logo */}
       <div className="px-5 py-4 border-b border-slate-800/80 flex items-center gap-3 bg-[#080D21]">
         {collegeLogo ? (

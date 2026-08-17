@@ -97,213 +97,185 @@ export default function PrintChallanPage() {
     { title: "College Copy - 3", num: 3 },
     { title: "Bank Copy - 4", num: 4 },
   ];
-
   return (
-    <div className="min-h-screen bg-gray-100 p-4 print:p-0 print:bg-white flex flex-col items-center">
-      <style>{`@media print { @page { size: landscape; margin: 5mm; } }`}</style>
+    <div className="min-h-screen bg-slate-100 p-4 print:p-0 print:bg-white flex flex-col items-center font-sans">
+      <style>{`
+        @media print { 
+          @page { size: landscape; margin: 5mm; } 
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white !important; }
+        }
+      `}</style>
       {/* Control bar */}
-      <div className="mb-6 print:hidden w-full max-w-7xl bg-white p-4 rounded-xl shadow-md border flex justify-between items-center">
+      <div className="mb-6 print:hidden w-full max-w-7xl bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
         <div>
-          <h1 className="text-lg font-bold text-gray-800">Print Challan - {challan.challanNumber}</h1>
-          <p className="text-xs text-gray-500">Challan copy for landscape A4 printing.</p>
+          <h1 className="text-xl font-black text-slate-900 tracking-tight">Official Challan - {challan.challanNumber}</h1>
+          <p className="text-sm font-medium text-slate-500 mt-1">Ready for landscape A4 printing.</p>
         </div>
         <button
           onClick={() => window.print()}
-          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-lg transition-colors shadow flex items-center gap-2"
+          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition-colors shadow-sm shadow-blue-500/20 flex items-center gap-2"
         >
-          🖨️ Print / Save as PDF
+          🖨️ Print Document
         </button>
       </div>
 
       {/* Printable Sheet */}
-      <div className="w-full max-w-[297mm] bg-white p-4 print:p-0 flex gap-4 justify-between border print:border-none shadow-lg print:shadow-none min-h-[210mm] overflow-hidden text-[10px] text-gray-800 leading-tight">
+      <div className="w-full max-w-[297mm] bg-white print:p-0 flex justify-between border-2 border-slate-800 print:border-none shadow-2xl print:shadow-none min-h-[200mm] overflow-hidden text-[10px] text-slate-800 leading-tight relative">
         {copies.map((copy, i) => (
           <div
             key={copy.num}
-            className={`w-[24%] flex flex-col justify-between p-2 relative ${
-              i < 3 ? "border-r-2 border-dashed border-gray-300 pr-4" : ""
+            className={`w-[25%] flex flex-col justify-between p-3 relative ${
+              i < 3 ? "border-r-[1.5px] border-dashed border-slate-400" : ""
             }`}
           >
-            {/* Header info */}
-            <div className="space-y-2">
-              <div className="text-center font-bold text-gray-500 text-[9px] uppercase tracking-wider border-b pb-1 mb-2">
-                {copy.title}
+            {/* Watermark Logo */}
+            {settings.COLLEGE_LOGO && (
+              <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none z-0">
+                <img src={settings.COLLEGE_LOGO} alt="watermark" className="w-48 h-48 grayscale" />
+              </div>
+            )}
+            
+            <div className="relative z-10 space-y-2">
+              {/* Copy Title */}
+              <div className="flex justify-between items-center border-b-[1.5px] border-slate-800 pb-1.5 mb-2">
+                <span className="font-black text-slate-900 text-[10px] uppercase tracking-widest">{copy.title}</span>
+                <span className="font-bold text-slate-500 text-[8px]">Copy {copy.num}/4</span>
               </div>
 
               {/* Logo & title */}
-              <div className="flex items-center gap-1.5 justify-center mb-1 text-center">
+              <div className="flex items-center gap-2 mb-2">
                 {settings.COLLEGE_LOGO ? (
-                  <img src={settings.COLLEGE_LOGO} alt="College Logo" className="w-6 h-6 object-contain" />
+                  <img src={settings.COLLEGE_LOGO} alt="Logo" className="w-10 h-10 object-contain drop-shadow-sm" />
                 ) : (
-                  <span className="text-xl">🏛️</span>
+                  <span className="text-2xl">🏛️</span>
                 )}
-                <div className="text-left leading-none">
-                  <div className="font-extrabold text-[8.5px] text-gray-900 uppercase tracking-tight">
-                    {settings.COLLEGE_NAME || "Government Post Graduate College Quetta"}
+                <div className="leading-tight">
+                  <div className="font-black text-[10px] text-slate-900 uppercase tracking-tight">
+                    {settings.COLLEGE_NAME || "Govt. Postgraduate College"}
                   </div>
-                  <div className="text-[7px] text-gray-400">Computer Generated Challan</div>
+                  <div className="text-[7px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">Official Fee Challan</div>
                 </div>
               </div>
 
-              <div className="text-center bg-gray-50 py-1 border rounded text-[7px] font-semibold text-gray-600 uppercase tracking-wide">
-                Bank: {settings.CHALLAN_BANK_NAME || "Habib Bank Limited (HBL)"}<br/>
-                Branch Code: {settings.CHALLAN_BRANCH_CODE || "0873"}<br/>
-                Title: {settings.CHALLAN_ACCOUNT_TITLE || "Principal Govt College"}<br/>
-                A/C No: {settings.CHALLAN_BANK_ACCOUNT || "08730001324203"}
+              {/* Bank Details */}
+              <div className="bg-slate-50 border border-slate-300 p-1.5 rounded text-[7.5px] font-bold text-slate-700 uppercase tracking-wide leading-relaxed shadow-sm">
+                <div className="flex justify-between"><span>Bank:</span> <span className="text-slate-900">{settings.CHALLAN_BANK_NAME || "HBL"}</span></div>
+                <div className="flex justify-between"><span>Branch:</span> <span className="text-slate-900">{settings.CHALLAN_BRANCH_CODE || "0873"}</span></div>
+                <div className="flex justify-between"><span>Title:</span> <span className="text-slate-900 truncate max-w-[120px]">{settings.CHALLAN_ACCOUNT_TITLE || "Principal Govt College"}</span></div>
+                <div className="flex justify-between"><span>A/C No:</span> <span className="text-slate-900 font-black">{settings.CHALLAN_BANK_ACCOUNT || "08730001324203"}</span></div>
               </div>
 
               {/* Barcode/QR mockup */}
-              <div className="my-2 text-center">
-                <div className="inline-block bg-white border p-1 rounded">
-                  {/* CSS Mock Barcode */}
-                  <div className="flex items-center justify-center gap-[1px] h-6 w-36 bg-gray-100 px-1">
-                    {[1,2,1,3,1,2,4,1,2,3,1,2,1,4,1,2,3,1,2,1,3,1,2,4,1].map((w, idx) => (
-                      <div key={idx} className="bg-black h-full" style={{ width: `${w}px` }}></div>
-                    ))}
-                  </div>
+              <div className="my-2 flex flex-col items-center justify-center">
+                <div className="flex items-center h-5 w-32 bg-slate-900 px-1">
+                  {[1,2,1,3,1,2,4,1,2,3,1,2,1,4,1,2,3,1,2,1,3,1,2,4,1].map((w, idx) => (
+                    <div key={idx} className="bg-white h-full" style={{ width: `${w}px`, marginRight: '1px' }}></div>
+                  ))}
                 </div>
-                <div className="text-[8px] font-mono text-gray-500 mt-1">*{challan.challanNumber}*</div>
+                <div className="text-[9px] font-black tracking-widest text-slate-700 mt-1">*{challan.challanNumber}*</div>
               </div>
 
               {/* Status indicator on printed challan */}
               {challan.status === "PAID" && (
-                <div className="absolute top-24 right-4 rotate-12 border-2 border-green-500 text-green-500 font-black text-xs uppercase px-2 py-0.5 rounded opacity-40">
+                <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-12 border-[3px] border-emerald-500/40 text-emerald-500/40 font-black text-2xl uppercase px-4 py-1 rounded-lg">
                   PAID
                 </div>
               )}
 
               {/* Details table */}
-              <div className="space-y-1.5 mt-2">
-                <div className="flex justify-between border-b pb-0.5">
-                  <span className="text-gray-500">Challan No:</span>
-                  <span className="font-bold text-gray-900">{challan.challanNumber}</span>
+              <div className="space-y-1 mt-3">
+                <div className="flex justify-between items-end border-b border-slate-300 pb-0.5">
+                  <span className="text-slate-600 font-bold uppercase text-[7.5px]">Challan No.</span>
+                  <span className="font-black text-slate-900 text-[9px]">{challan.challanNumber}</span>
                 </div>
-                <div className="flex justify-between border-b pb-0.5">
-                  <span className="text-gray-500">CNIC / Form B:</span>
-                  <span className="font-bold font-mono text-gray-900">{challan.cnic}</span>
+                <div className="flex justify-between items-end border-b border-slate-300 pb-0.5">
+                  <span className="text-slate-600 font-bold uppercase text-[7.5px]">CNIC / B-Form</span>
+                  <span className="font-black font-mono text-slate-900">{challan.cnic}</span>
                 </div>
-                <div className="flex justify-between border-b pb-0.5">
-                  <span className="text-gray-500">Name:</span>
-                  <span className="font-bold text-gray-900 truncate max-w-[120px]">{challan.applicantName}</span>
+                <div className="flex justify-between items-end border-b border-slate-300 pb-0.5">
+                  <span className="text-slate-600 font-bold uppercase text-[7.5px]">Student Name</span>
+                  <span className="font-black text-slate-900 truncate max-w-[130px]">{challan.applicantName}</span>
                 </div>
                 {challan.fatherName && (
-                  <div className="flex justify-between border-b pb-0.5">
-                    <span className="text-gray-500">Father Name:</span>
-                    <span className="font-medium truncate max-w-[120px]">{challan.fatherName}</span>
+                  <div className="flex justify-between items-end border-b border-slate-300 pb-0.5">
+                    <span className="text-slate-600 font-bold uppercase text-[7.5px]">Father Name</span>
+                    <span className="font-bold text-slate-800 truncate max-w-[130px]">{challan.fatherName}</span>
                   </div>
                 )}
-                <div className="flex justify-between border-b pb-0.5">
-                  <span className="text-gray-500">Gender:</span>
-                  <span className="font-medium">{challan.gender || "MALE"}</span>
+                <div className="flex justify-between items-end border-b border-slate-300 pb-0.5">
+                  <span className="text-slate-600 font-bold uppercase text-[7.5px]">Program</span>
+                  <span className="font-black text-slate-900 truncate max-w-[130px]">{challan.program?.name || "BS"}</span>
                 </div>
-                <div className="flex justify-between border-b pb-0.5">
-                  <span className="text-gray-500">Program:</span>
-                  <span className="font-bold text-gray-900 truncate max-w-[120px]">{challan.program?.name || "BS"}</span>
-                </div>
-                {challan.session && (
-                  <div className="flex justify-between border-b pb-0.5">
-                    <span className="text-gray-500">Session:</span>
-                    <span className="font-medium">{challan.session}</span>
-                  </div>
-                )}
                 {challan.semester && (
-                  <div className="flex justify-between border-b pb-0.5">
-                    <span className="text-gray-500">Semester:</span>
-                    <span className="font-medium">{challan.semester}</span>
+                  <div className="flex justify-between items-end border-b border-slate-300 pb-0.5">
+                    <span className="text-slate-600 font-bold uppercase text-[7.5px]">Semester</span>
+                    <span className="font-bold text-slate-800">{challan.semester}</span>
                   </div>
                 )}
-                <div className="flex justify-between border-b pb-0.5">
-                  <span className="text-gray-500">Due Date:</span>
-                  <span className="font-bold text-gray-900">{new Date(challan.dueDate).toLocaleDateString()}</span>
+                <div className="flex justify-between items-end border-b border-slate-300 pb-0.5">
+                  <span className="text-slate-600 font-bold uppercase text-[7.5px]">Due Date</span>
+                  <span className="font-black text-rose-700">{new Date(challan.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                 </div>
-                <div className="flex justify-between border-b pb-0.5">
-                  <span className="text-gray-500">Particulars:</span>
-                  <span className="font-medium text-gray-700">{challan.particulars}</span>
+                <div className="flex justify-between items-end border-b border-slate-300 pb-0.5">
+                  <span className="text-slate-600 font-bold uppercase text-[7.5px]">Fee Type</span>
+                  <span className="font-bold text-slate-800 truncate">{challan.feeLabel}</span>
                 </div>
               </div>
 
               {/* Amount Info */}
-              <div className="bg-gray-50 p-2 rounded border mt-3 space-y-1">
+              <div className="mt-3 bg-slate-900 p-2 rounded text-white shadow-inner">
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-gray-600">Amount:</span>
-                  <span className="font-black text-gray-900 text-sm">Rs. {challan.amount.toLocaleString()}/-</span>
+                  <span className="font-bold uppercase tracking-wider text-[8px] text-slate-300">Total Payable</span>
+                  <span className="font-black text-sm tracking-tight">Rs. {challan.amount.toLocaleString()}</span>
                 </div>
-                <div className="text-[7px] text-gray-400 uppercase italic leading-tight">
-                  ({toWords(challan.amount)} rupees only)
+                <div className="text-[7.5px] text-slate-400 uppercase font-medium mt-1 leading-tight border-t border-slate-700 pt-1">
+                  {toWords(challan.amount)} rupees only
                 </div>
               </div>
 
               {/* Paid details */}
               {challan.paidId && (
-                <div className="mt-2 p-1.5 bg-green-50 text-green-700 border border-green-100 rounded text-[7px] font-mono leading-none">
-                  <strong>PAID ID:</strong> {challan.paidId}<br/>
-                  <strong>DATE:</strong> {challan.paidAt ? new Date(challan.paidAt).toLocaleDateString() : ""}
+                <div className="mt-2 p-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded text-[7.5px] font-bold uppercase tracking-wide flex justify-between">
+                  <span>Trx ID: <span className="font-black font-mono">{challan.paidId}</span></span>
+                  <span>Date: {challan.paidAt ? new Date(challan.paidAt).toLocaleDateString() : ""}</span>
                 </div>
               )}
             </div>
 
             {/* Bottom section (signatures + footer) */}
-            <div className="space-y-4 mt-6">
-              <div className="grid grid-cols-2 gap-4 text-[7px] font-medium text-gray-500 pt-4">
-                <div className="text-left border-t border-gray-300 pt-1">
-                  Depositor Signature
-                </div>
-                <div className="text-right border-t border-gray-300 pt-1">
-                  Bank Cashier / Officer
-                </div>
-              </div>
-
-              {/* Stamp and QR Code side-by-side */}
-              <div className="flex items-stretch gap-2 h-14">
-                <div className="flex-1 border-2 border-dashed border-gray-200 rounded flex items-center justify-center text-gray-300 font-bold text-[8px] uppercase tracking-wider">
-                  Bank Stamp
-                </div>
-                <div className="w-14 h-14 border rounded p-0.5 bg-white flex items-center justify-center shadow-sm">
+            <div className="relative z-10 mt-4 flex flex-col justify-end flex-1 space-y-4">
+              {/* Stamp and QR Code */}
+              <div className="flex justify-between items-end gap-3">
+                <div className="w-12 h-12 border-2 border-slate-800 rounded bg-white flex items-center justify-center shadow-sm shrink-0 p-0.5">
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(
-                      `CHALLAN:${challan.challanNumber}|NAME:${challan.applicantName}|CNIC:${challan.cnic}|AMOUNT:${challan.amount}|STATUS:${challan.status}`
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(
+                      `CHALLAN:${challan.challanNumber}|NAME:${challan.applicantName}|CNIC:${challan.cnic}|AMOUNT:${challan.amount}`
                     )}`}
-                    alt="Challan QR"
+                    alt="QR"
                     className="w-full h-full object-contain"
                   />
                 </div>
+                <div className="flex-1 h-12 border-2 border-dashed border-slate-300 rounded flex items-center justify-center text-slate-400 font-black text-[9px] uppercase tracking-widest bg-slate-50/50">
+                  Bank Stamp
+                </div>
+              </div>
+
+              {/* Signatures */}
+              <div className="grid grid-cols-2 gap-4 text-[7.5px] font-bold text-slate-600 uppercase tracking-wider pt-2">
+                <div className="text-center border-t border-slate-800 pt-1">Depositor</div>
+                <div className="text-center border-t border-slate-800 pt-1">Bank Officer</div>
               </div>
 
               {/* Disclaimers */}
-              <div className="text-[6px] text-gray-400 space-y-0.5 border-t pt-1 leading-tight">
-                <p>• Challan must be paid on generation / due date.</p>
-                <p>• Over-writing or any modification is not accepted.</p>
-                <p>• Copy of paid challan must be retained by the student.</p>
-                <p>• College/Bank not responsible if paid receipt is lost.</p>
+              <div className="text-[6.5px] text-slate-500 space-y-0.5 border-t border-slate-300 pt-1.5 font-medium leading-tight">
+                <p>• Valid till due date. Late fee may apply afterwards.</p>
+                <p>• Bank is requested to receive amount and return relevant copies.</p>
+                <p>• Computer generated document, no signature required.</p>
               </div>
             </div>
           </div>
         ))}
       </div>
-
-      {/* Global Landscape print styling */}
-      <style jsx global>{`
-        @media print {
-          @page {
-            size: A4 landscape;
-            margin: 0;
-          }
-          body {
-            background: white !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-          .print\\:p-0 {
-            padding: 0 !important;
-          }
-          .print\\:border-none {
-            border: none !important;
-          }
-          .print\\:shadow-none {
-            box-shadow: none !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }
