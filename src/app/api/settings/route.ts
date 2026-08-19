@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS = [
   { key: "CHALLAN_SEQUENCE_CURRENT", value: "135622565" },
   { key: "ROLL_NUMBER_PATTERN", value: "[YEAR]-[CODE]-[SEQ]" },
   { key: "ROLL_SEQUENCE_CURRENT", value: "1" },
-  { key: "ACADEMIC_SESSIONS", value: "2022,2023,2024,2025,2026,2027" },
+  { key: "ACADEMIC_SESSIONS", value: "2024-2028, 2025-2029, 2026-2030, 2023-2027, 2022-2026, 2024-2026, 2025-2027, 2026-2028, 2023-2025, 2022-2024" },
   { key: "DEFAULT_FACULTY_PASSWORD", value: "gpgcq123" },
   { key: "FACULTY_EMAIL_DOMAIN", value: "@gpgcquetta.edu.pk" },
 ];
@@ -56,11 +56,16 @@ export async function POST(request: Request) {
 
     const body = await request.json(); // expected e.g. { CHALLAN_BANK_ACCOUNT: "...", CHALLAN_SEQUENCE_START: "..." }
 
-    for (const [key, value] of Object.entries(body)) {
+    for (let [key, value] of Object.entries(body)) {
+      let stringValue = String(value);
+      if (key === "ACADEMIC_SESSIONS") {
+        const { filterValidSessions } = await import("@/lib/sessionHelper");
+        stringValue = filterValidSessions(stringValue).join(", ");
+      }
       await prisma.systemSetting.upsert({
         where: { key },
-        update: { value: String(value) },
-        create: { key, value: String(value) },
+        update: { value: stringValue },
+        create: { key, value: stringValue },
       });
     }
 

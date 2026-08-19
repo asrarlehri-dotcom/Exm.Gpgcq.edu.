@@ -12,7 +12,7 @@ const ROUTE_ROLES: Record<string, string[]> = {
   "/dashboard":             [], // all authenticated
 };
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const protectedPrefixes = ["/admin", "/intermediate", "/bs", "/faculty", "/student", "/dashboard"];
   const isProtected = protectedPrefixes.some((p) => path.startsWith(p));

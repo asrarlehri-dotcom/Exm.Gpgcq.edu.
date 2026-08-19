@@ -94,6 +94,15 @@ export async function POST(request: Request) {
       }
     }
 
+    // Ensure session is strictly a 4-year or 2-year span, never a single year
+    const { isValidSession, calculateSessionFromYear } = await import("@/lib/sessionHelper");
+    let computedSession = session;
+    if (!isValidSession(computedSession)) {
+      const year = session && /^\d{4}$/.test(session) ? session : new Date().getFullYear();
+      const type = educationLevel === "INTERMEDIATE" ? "INTERMEDIATE" : (bsAdmissionType || "REGULAR");
+      computedSession = calculateSessionFromYear(year, type as any, migrationSemester);
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       const admission = await tx.admission.create({
         data: {
@@ -110,7 +119,7 @@ export async function POST(request: Request) {
         groupId: groupId || null,
         bsAdmissionType: bsAdmissionType || null,
         migrationSemester: bsAdmissionType === "MIGRATION" ? (migrationSemester ?? null) : null,
-        session: session || null,
+        session: computedSession || null,
         gender: gender || null,
         sscGroup: sscGroup || null,
         sscObtained: sscObtained ? Number(sscObtained) : null,

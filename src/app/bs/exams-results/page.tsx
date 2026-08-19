@@ -114,8 +114,12 @@ function MarksEntryTable() {
   const [searchQuery, setSearchQuery] = useState("");
   const [programs, setPrograms] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<string[]>([
+    "2024-2028", "2025-2029", "2026-2030", "2023-2027", "2022-2026",
+    "2024-2026", "2025-2027", "2026-2028", "2023-2025", "2022-2024"
+  ]);
   const [selectedProgType, setSelectedProgType] = useState("ALL");
-  const [selectedSession, setSelectedSession] = useState("2025");
+  const [selectedSession, setSelectedSession] = useState("2024-2028");
   const [selectedProgram, setSelectedProgram] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("2");
   const [selectedCourse, setSelectedCourse] = useState("");
@@ -159,14 +163,25 @@ function MarksEntryTable() {
     loadMetrics();
   }, []);
 
-  // Load programs & courses from API with smart auto-selection for Faculty
+  // Load programs & courses & settings from API with smart auto-selection for Faculty
   useEffect(() => {
     Promise.all([
       fetch("/api/programs").then(r => r.ok ? r.json() : []),
-      fetch("/api/courses").then(r => r.ok ? r.json() : [])
-    ]).then(([pData, cData]) => {
+      fetch("/api/courses").then(r => r.ok ? r.json() : []),
+      fetch("/api/settings").then(r => r.ok ? r.json() : {})
+    ]).then(async ([pData, cData, sData]) => {
       const validProgs = Array.isArray(pData) ? pData.filter((p: any) => p.educationLevel === "BS" || !p.educationLevel) : [];
       const validCourses = Array.isArray(cData) ? cData : [];
+
+      const settingsObj = (sData as any) || {};
+      if (settingsObj.ACADEMIC_SESSIONS) {
+        const { filterValidSessions } = await import("@/lib/sessionHelper");
+        const validList = filterValidSessions(settingsObj.ACADEMIC_SESSIONS);
+        setSessions(validList);
+        if (validList.length > 0 && !validList.includes(selectedSession)) {
+          setSelectedSession(validList[0]);
+        }
+      }
 
       setPrograms(validProgs);
       setCourses(validCourses);
@@ -602,10 +617,9 @@ function MarksEntryTable() {
               onChange={e => setSelectedSession(e.target.value)}
             >
               <option value="">-- Session --</option>
-              <option value="2024">2024</option>
-              <option value="2025">2025</option>
-              <option value="2026">2026</option>
-              <option value="2027">2027</option>
+              {sessions.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
             </select>
           </div>
 
@@ -1275,8 +1289,14 @@ function MeritScholarshipsTab() {
             <div className="flex-1">
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Session</label>
               <select className="w-full px-4 py-2 border rounded-lg bg-white text-sm" value={sessionFilter} onChange={e => setSessionFilter(e.target.value)}>
-                <option>Fall 2026</option>
-                <option>Spring 2027</option>
+                <option value="2024-2028">2024-2028</option>
+                <option value="2025-2029">2025-2029</option>
+                <option value="2026-2030">2026-2030</option>
+                <option value="2023-2027">2023-2027</option>
+                <option value="2022-2026">2022-2026</option>
+                <option value="2024-2026">2024-2026</option>
+                <option value="2025-2027">2025-2027</option>
+                <option value="2026-2028">2026-2028</option>
               </select>
             </div>
             <div className="flex-1">

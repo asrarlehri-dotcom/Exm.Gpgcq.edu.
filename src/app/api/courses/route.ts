@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-export function parseCreditHoursHelper(input: any, theoryInput?: any, labInput?: any, courseType?: string) {
+function parseCreditHoursHelper(input: any, theoryInput?: any, labInput?: any, courseType?: string) {
   const str = String(input || "").trim();
   const match = str.match(/^(\d+)\s*\(\s*(\d+)\s*[\-\/]\s*(\d+)\s*\)$/);
   if (match) {

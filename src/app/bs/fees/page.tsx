@@ -61,7 +61,7 @@ export default function BsFeesPage() {
   const [name, setName]           = useState("");
   const [father, setFather]       = useState("");
   const [feeType, setFeeType]     = useState("");
-  const [session, setSession]     = useState(new Date().getFullYear().toString());
+  const [session, setSession]     = useState("2024-2028");
   const [semester, setSemester]   = useState("");
   const [gender, setGender]       = useState("MALE");
   const [programId, setProgramId] = useState("");
@@ -551,9 +551,14 @@ export default function BsFeesPage() {
 
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Session (Year)</label>
-                  <input type="number" value={session} onChange={e => setSession(e.target.value)} min={2000} max={2099}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400 outline-none text-sm" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Academic Session</label>
+                  <input
+                    type="text"
+                    value={session}
+                    onChange={e => setSession(e.target.value)}
+                    placeholder="e.g. 2024-2028 or 2024-2026"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400 outline-none text-sm"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>

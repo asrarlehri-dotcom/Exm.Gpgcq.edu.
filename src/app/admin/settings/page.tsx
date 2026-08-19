@@ -469,7 +469,11 @@ export default function UnifiedSettingsPage() {
       setCollegeTagline(data.COLLEGE_TAGLINE || "College of Higher Education & Research");
       setCollegeAddress(data.COLLEGE_ADDRESS || "Quetta, Balochistan, Pakistan");
       if (data.ACADEMIC_SESSIONS) {
-        setAcademicSessions(data.ACADEMIC_SESSIONS.split(",").map((s: string) => s.trim()).filter(Boolean));
+        const { filterValidSessions } = await import("@/lib/sessionHelper");
+        setAcademicSessions(filterValidSessions(data.ACADEMIC_SESSIONS));
+      } else {
+        const { DEFAULT_ALL_SESSIONS } = await import("@/lib/sessionHelper");
+        setAcademicSessions(DEFAULT_ALL_SESSIONS);
       }
       if (data.ADMISSION_REQUIRED_FIELDS) {
         setAdmissionRequiredFields(data.ADMISSION_REQUIRED_FIELDS.split(",").map((s: string) => s.trim()).filter(Boolean));
@@ -1666,27 +1670,42 @@ export default function UnifiedSettingsPage() {
                     </div>
 
                     {/* Add new session input */}
-                    <div className="flex gap-2 max-w-sm">
-                      <input
-                        type="text"
-                        placeholder="e.g. 2026-2030 or 2024"
-                        className="flex-1 px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-400 outline-none text-xs"
-                        value={newSessionInput}
-                        onChange={(e) => setNewSessionInput(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const clean = newSessionInput.trim();
-                          if (clean && !academicSessions.includes(clean)) {
-                            setAcademicSessions(prev => [...prev, clean]);
-                            setNewSessionInput("");
-                          }
-                        }}
-                        className="px-4 py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
-                      >
-                        Add Session
-                      </button>
+                    <div className="space-y-2 max-w-md">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="e.g. 2024-2028 (BS) or 2024-2026 (Bridge/Inter)"
+                          className="flex-1 px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-400 outline-none text-xs"
+                          value={newSessionInput}
+                          onChange={(e) => setNewSessionInput(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const clean = newSessionInput.trim();
+                            if (!clean) return;
+                            const { isValidSession } = await import("@/lib/sessionHelper");
+                            if (/^\d{4}$/.test(clean)) {
+                              alert("Single-year sessions (e.g. " + clean + ") are not allowed. Please enter a 4-year span (e.g. " + clean + "-" + (parseInt(clean) + 4) + ") or 2-year span (e.g. " + clean + "-" + (parseInt(clean) + 2) + ").");
+                              return;
+                            }
+                            if (!isValidSession(clean)) {
+                              alert("Invalid session span. Must be a 4-year duration (e.g. 2024-2028 for BS) or 2-year duration (e.g. 2024-2026 for Bridge/Intermediate).");
+                              return;
+                            }
+                            if (!academicSessions.includes(clean)) {
+                              setAcademicSessions(prev => [...prev, clean]);
+                              setNewSessionInput("");
+                            }
+                          }}
+                          className="px-4 py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+                        >
+                          Add Session
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-gray-500 font-medium">
+                        💡 Only 4-year spans (BS) and 2-year spans (Bridging/Intermediate) are permitted. Single years are prohibited.
+                      </p>
                     </div>
                   </div>
 

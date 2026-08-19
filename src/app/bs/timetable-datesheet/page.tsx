@@ -221,15 +221,18 @@ export default function BSTimetableDatesheetPage() {
 
     fetch("/api/settings")
       .then(res => res.json())
-      .then(data => {
+      .then(async data => {
+        const { filterValidSessions, DEFAULT_ALL_SESSIONS } = await import("@/lib/sessionHelper");
         if (data.ACADEMIC_SESSIONS) {
-          const sessList = data.ACADEMIC_SESSIONS.split(",").map((s: string) => s.trim()).filter(Boolean);
-          setSessions(sessList);
+          setSessions(filterValidSessions(data.ACADEMIC_SESSIONS));
         } else {
-          setSessions(["2022", "2023", "2024", "2025", "2026", "2027"]);
+          setSessions(DEFAULT_ALL_SESSIONS);
         }
       })
-      .catch(() => setSessions(["2022", "2023", "2024", "2025", "2026", "2027"]));
+      .catch(async () => {
+        const { DEFAULT_ALL_SESSIONS } = await import("@/lib/sessionHelper");
+        setSessions(DEFAULT_ALL_SESSIONS);
+      });
   }, []);
 
   // Fetch Timetables

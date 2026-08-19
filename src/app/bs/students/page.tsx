@@ -96,11 +96,11 @@ export default function BSStudentsPage() {
       if (pRes.ok) setPrograms(await pRes.json());
       if (setRes.ok) {
         const data = await setRes.json();
+        const { filterValidSessions, DEFAULT_ALL_SESSIONS } = await import("@/lib/sessionHelper");
         if (data.ACADEMIC_SESSIONS) {
-          const parsedSessions = data.ACADEMIC_SESSIONS.split(",").map((s: string) => s.trim()).filter(Boolean);
-          setSessionOptions(parsedSessions);
+          setSessionOptions(filterValidSessions(data.ACADEMIC_SESSIONS));
         } else {
-          setSessionOptions(["2022-2026", "2023-2027", "2024-2028", "2025-2029"]);
+          setSessionOptions(DEFAULT_ALL_SESSIONS);
         }
       }
     } catch {

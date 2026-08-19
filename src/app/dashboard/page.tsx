@@ -33,11 +33,29 @@ type EducationLevel = "ALL" | "INTERMEDIATE" | "BS";
 export default function DashboardPage() {
   const { data: session } = useSession();
   const [level, setLevel] = useState<EducationLevel>("ALL");
-  const [selectedSession, setSelectedSession] = useState("2025-2026");
+  const [selectedSession, setSelectedSession] = useState("ALL");
+  const [dashboardSessions, setDashboardSessions] = useState<string[]>([
+    "2024-2028", "2025-2029", "2026-2030", "2023-2027", "2022-2026",
+    "2024-2026", "2025-2027", "2026-2028", "2023-2025", "2022-2024"
+  ]);
   const [dashData, setDashData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const userName = session?.user?.name || "Super Admin";
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then(res => res.json())
+      .then(async data => {
+        const { filterValidSessions, DEFAULT_ALL_SESSIONS } = await import("@/lib/sessionHelper");
+        if (data.ACADEMIC_SESSIONS) {
+          setDashboardSessions(filterValidSessions(data.ACADEMIC_SESSIONS));
+        } else {
+          setDashboardSessions(DEFAULT_ALL_SESSIONS);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -131,9 +149,10 @@ export default function DashboardPage() {
               onChange={(e) => setSelectedSession(e.target.value)}
               className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer"
             >
-              <option value="2025-2026">2025-2026</option>
-              <option value="2024-2025">2024-2025</option>
-              <option value="2023-2024">2023-2024</option>
+              <option value="ALL">All Sessions</option>
+              {dashboardSessions.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
             </select>
           </div>
 

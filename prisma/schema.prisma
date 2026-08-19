@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────
@@ -375,7 +376,7 @@ model ClassSection {
 
 model Timetable {
   id              String         @id @default(uuid())
-  session         String         @default("2022")
+  session         String         @default("2024-2028")
   semester        Int?
   dayOfWeek       String         
   startTime       String
@@ -428,7 +429,7 @@ model Course {
   theoryHours     Int?           @default(3)
   labHours        Int?           @default(0)
   courseType      String         @default("THEORY") // THEORY, PRACTICAL
-  session         String         @default("2022")
+  session         String         @default("2024-2028")
   semester        Int
   programId       String
   program         Program        @relation(fields: [programId], references: [id])
@@ -482,7 +483,7 @@ model Exam {
 
 model Datesheet {
   id              String         @id @default(uuid())
-  session         String         @default("2022")
+  session         String         @default("2024-2028")
   semester        Int?
   examType        String         @default("FINAL_TERM")
   examSession     String?

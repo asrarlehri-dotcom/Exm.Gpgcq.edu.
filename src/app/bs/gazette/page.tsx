@@ -342,8 +342,8 @@ export default function GazetteCompilerPage() {
   const [allStudents, setAllStudents] = useState<StudentData[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [sessionOptions, setSessionOptions] = useState<string[]>([
-    "2026", "2025", "2024", "2023", "2022",
-    "2025-2029", "2024-2028", "2023-2027", "2022-2026"
+    "2024-2028", "2025-2029", "2026-2030", "2023-2027", "2022-2026",
+    "2024-2026", "2025-2027", "2026-2028", "2023-2025", "2022-2024"
   ]);
   const [selectedSemester, setSelectedSemester] = useState<number>(1);
   const [selectedSession, setSelectedSession] = useState<string>("ALL");
@@ -368,14 +368,14 @@ export default function GazetteCompilerPage() {
     // Extract sessions from database students
     fetch("/api/students?educationLevel=BS")
       .then((r) => r.json())
-      .then((data) => {
+      .then(async (data) => {
+        const { filterValidSessions, DEFAULT_ALL_SESSIONS } = await import("@/lib/sessionHelper");
         if (Array.isArray(data)) {
           const dbSessions = Array.from(new Set(data.map((s: any) => s.session).filter(Boolean))) as string[];
           const settingSessions = settings.ACADEMIC_SESSIONS
             ? settings.ACADEMIC_SESSIONS.split(",").map((s: string) => s.trim()).filter(Boolean)
             : [];
-          const defaults = ["2026", "2025", "2024", "2023", "2022", "2025-2029", "2024-2028", "2023-2027", "2022-2026"];
-          const combined = Array.from(new Set([...dbSessions, ...settingSessions, ...defaults])).sort().reverse();
+          const combined = filterValidSessions([...dbSessions, ...settingSessions, ...DEFAULT_ALL_SESSIONS]).sort().reverse();
           setSessionOptions(combined);
         }
       });

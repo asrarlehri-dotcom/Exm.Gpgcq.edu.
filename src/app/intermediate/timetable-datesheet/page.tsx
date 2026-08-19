@@ -22,16 +22,18 @@ export default function InterTimetableDatesheetPage() {
   const [allPrograms, setAllPrograms] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [faculties, setFaculties] = useState<any[]>([]);
-  const [sessions, setSessions] = useState<string[]>([]);
+  const [sessions, setSessions] = useState<string[]>([
+    "2024-2026", "2025-2027", "2026-2028", "2023-2025", "2022-2024"
+  ]);
 
-  // ── TIMETABLE filters (Level is fixed to INTERMEDIATE)
-  const [tSession, setTSession] = useState("2024");
+  // ── TIMETABLE filters (Level is fixed to INTERMEDIATE - 2-Year Spans)
+  const [tSession, setTSession] = useState("2024-2026");
   const [tProgramId, setTProgramId] = useState("");
   const [tDepartmentId, setTDepartmentId] = useState("");
   const [timetables, setTimetables] = useState<any[]>([]);
 
   // ── DATESHEET filters
-  const [dSession, setDSession] = useState("2024");
+  const [dSession, setDSession] = useState("2024-2026");
   const [dProgramId, setDProgramId] = useState("");
   const [dDepartmentId, setDDepartmentId] = useState("");
   const [dSemester, setDSemester] = useState("1");
@@ -56,19 +58,23 @@ export default function InterTimetableDatesheetPage() {
 
     fetch("/api/settings")
       .then(res => res.json())
-      .then(data => {
+      .then(async data => {
+        const { filterValidSessions, DEFAULT_2YEAR_SESSIONS } = await import("@/lib/sessionHelper");
         if (data.ACADEMIC_SESSIONS) {
-          const list = data.ACADEMIC_SESSIONS.split(",").map((s: string) => s.trim()).filter(Boolean);
+          const list = filterValidSessions(data.ACADEMIC_SESSIONS);
           setSessions(list);
-          if (list.includes("2024")) {
-            setTSession("2024");
-            setDSession("2024");
+          if (list.length > 0) {
+            setTSession(list[0]);
+            setDSession(list[0]);
           }
         } else {
-          setSessions(["2022", "2023", "2024", "2025", "2026", "2027"]);
+          setSessions(DEFAULT_2YEAR_SESSIONS);
         }
       })
-      .catch(() => setSessions(["2022", "2023", "2024", "2025", "2026", "2027"]));
+      .catch(async () => {
+        const { DEFAULT_2YEAR_SESSIONS } = await import("@/lib/sessionHelper");
+        setSessions(DEFAULT_2YEAR_SESSIONS);
+      });
   }, []);
 
   // Fetch timetables

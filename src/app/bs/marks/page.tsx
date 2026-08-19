@@ -41,8 +41,12 @@ export default function AddResultPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [programs, setPrograms] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<string[]>([
+    "2024-2028", "2025-2029", "2026-2030", "2023-2027", "2022-2026",
+    "2024-2026", "2025-2027", "2026-2028", "2023-2025", "2022-2024"
+  ]);
   const [selectedProgType, setSelectedProgType] = useState("ALL");
-  const [selectedSession, setSelectedSession] = useState("2025");
+  const [selectedSession, setSelectedSession] = useState("2024-2028");
   const [selectedProgram, setSelectedProgram] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("1");
   const [selectedCourse, setSelectedCourse] = useState("");
@@ -124,10 +128,17 @@ export default function AddResultPage() {
     setFetchingCourses(true);
     Promise.all([
       fetch("/api/programs", { cache: "no-store" }).then(r => r.ok ? r.json() : []),
-      fetch("/api/courses", { cache: "no-store" }).then(r => r.ok ? r.json() : [])
-    ]).then(([pData, cData]) => {
+      fetch("/api/courses", { cache: "no-store" }).then(r => r.ok ? r.json() : []),
+      fetch("/api/settings", { cache: "no-store" }).then(r => r.ok ? r.json() : {})
+    ]).then(async ([pData, cData, sData]) => {
       const validProgs = Array.isArray(pData) ? pData.filter((p: any) => p.educationLevel === "BS" || !p.educationLevel) : [];
       const validCourses = Array.isArray(cData) ? cData : [];
+
+      const settingsObj = (sData as any) || {};
+      if (settingsObj.ACADEMIC_SESSIONS) {
+        const { filterValidSessions } = await import("@/lib/sessionHelper");
+        setSessions(filterValidSessions(settingsObj.ACADEMIC_SESSIONS));
+      }
 
       setPrograms(validProgs);
       setCourses(validCourses);
@@ -811,11 +822,9 @@ export default function AddResultPage() {
                   value={selectedSession}
                   onChange={(e) => setSelectedSession(e.target.value)}
                 >
-                  <option value="2022">2022</option>
-                  <option value="2023">2023</option>
-                  <option value="2024">2024</option>
-                  <option value="2025">2025</option>
-                  <option value="2026">2026</option>
+                  {sessions.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </select>
               </div>
 

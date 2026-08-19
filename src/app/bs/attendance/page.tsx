@@ -46,11 +46,15 @@ export default function BsAttendancePage() {
       const sRes = await fetch("/api/settings");
       if (sRes.ok) {
         const data = await sRes.json();
+        const { filterValidSessions, DEFAULT_ALL_SESSIONS } = await import("@/lib/sessionHelper");
         if (data.ACADEMIC_SESSIONS) {
-          setSessions(data.ACADEMIC_SESSIONS.split(",").map((s: string) => s.trim()).filter(Boolean));
+          setSessions(filterValidSessions(data.ACADEMIC_SESSIONS));
         } else {
-          setSessions(["2022", "2023", "2024", "2025", "2026", "2027"]);
+          setSessions(DEFAULT_ALL_SESSIONS);
         }
+      } else {
+        const { DEFAULT_ALL_SESSIONS } = await import("@/lib/sessionHelper");
+        setSessions(DEFAULT_ALL_SESSIONS);
       }
     } catch (e) {
       console.error("Error loading filters", e);
