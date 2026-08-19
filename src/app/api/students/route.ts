@@ -43,9 +43,24 @@ export async function GET(req: NextRequest) {
       where: {
         ...(educationLevel && { educationLevel }),
         ...(programId && { programId }),
-        ...(sessionParam && { session: sessionParam }),
+        ...(sessionParam && sessionParam !== "ALL" && {
+          OR: [
+            { session: sessionParam },
+            { session: { contains: sessionParam } },
+          ],
+        }),
       },
-      include: { user: true, program: true, group: true, statuses: true },
+      include: {
+        user: true,
+        program: true,
+        group: true,
+        statuses: true,
+        marks: {
+          include: {
+            course: true,
+          },
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(students);

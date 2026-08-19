@@ -19,6 +19,12 @@ export default function FacultyPage() {
   const [form, setForm] = useState({ name: "", email: "", password: "", departmentId: "", educationLevel: "BOTH" });
   const [editDept, setEditDept] = useState("");
   const [editLevel, setEditLevel] = useState("BOTH");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleAll = (ids: string[]) =>
+    setSelectedIds(prev => prev.length === ids.length ? [] : ids);
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -80,8 +86,13 @@ export default function FacultyPage() {
       {success && <div className="bg-green-50 text-green-600 p-3 rounded-lg text-sm border border-green-100">{success}</div>}
 
       {/* Search */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex gap-3 items-center">
         <input className={INPUT} placeholder="🔍 Search by name or email..." value={search} onChange={e => setSearch(e.target.value)} />
+        {selectedIds.length > 0 && (
+          <span className="px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded-full whitespace-nowrap">
+            {selectedIds.length} selected
+          </span>
+        )}
       </div>
 
       {/* Table */}
@@ -90,6 +101,11 @@ export default function FacultyPage() {
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-50 border-b">
               <tr>
+                <th className="px-3 py-3 w-10">
+                  <input type="checkbox" className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                    checked={selectedIds.length === filtered.length && filtered.length > 0}
+                    onChange={() => toggleAll(filtered.map(f => f.id))} />
+                </th>
                 <th className="px-5 py-3 font-semibold text-gray-600">#</th>
                 <th className="px-5 py-3 font-semibold text-gray-600">Name & Email</th>
                 <th className="px-5 py-3 font-semibold text-gray-600">Department</th>
@@ -100,7 +116,12 @@ export default function FacultyPage() {
             </thead>
             <tbody>
               {filtered.map((f, i) => (
-                <tr key={f.id} className={`border-b hover:bg-gray-50 ${!f.isActive ? "opacity-60" : ""}`}>
+                <tr key={f.id} className={`border-b hover:bg-gray-50 transition-colors ${!f.isActive ? "opacity-60" : ""} ${selectedIds.includes(f.id) ? "bg-blue-50/60" : ""}`}>
+                  <td className="px-3 py-3">
+                    <input type="checkbox" className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                      checked={selectedIds.includes(f.id)}
+                      onChange={() => toggleSelect(f.id)} />
+                  </td>
                   <td className="px-5 py-3 text-gray-400">{i + 1}</td>
                   <td className="px-5 py-3">
                     <div className="font-medium text-gray-900">{f.user?.name}</div>
@@ -128,7 +149,7 @@ export default function FacultyPage() {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={6} className="text-center py-10 text-gray-400">No faculty found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={7} className="text-center py-10 text-gray-400">No faculty found.</td></tr>}
             </tbody>
           </table>
         )}

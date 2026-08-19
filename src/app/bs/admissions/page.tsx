@@ -46,6 +46,12 @@ export default function BsAdmissionsPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("ALL");
   const [msg, setMsg] = useState({ type: "", text: "" });
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleAll = (ids: string[]) =>
+    setSelectedIds(prev => prev.length === ids.length ? [] : ids);
 
   // Edit form states
   const [editingAdmission, setEditingAdmission] = useState<Admission | null>(null);
@@ -353,6 +359,11 @@ export default function BsAdmissionsPage() {
         <span className="ml-auto text-sm text-gray-400 self-center">
           {filtered.length} / {admissions.length}
         </span>
+        {selectedIds.length > 0 && (
+          <span className="px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded-full self-center">
+            {selectedIds.length} selected
+          </span>
+        )}
       </div>
 
       {/* Table */}
@@ -364,6 +375,11 @@ export default function BsAdmissionsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b">
+                  <th className="px-3 py-3 w-10">
+                    <input type="checkbox" className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                      checked={selectedIds.length === filtered.length && filtered.length > 0}
+                      onChange={() => toggleAll(filtered.map(a => a.id))} />
+                  </th>
                   <th className="px-5 py-3 text-left font-semibold text-gray-600">#</th>
                   <th className="px-5 py-3 text-left font-semibold text-gray-600">Student</th>
                   <th className="px-5 py-3 text-left font-semibold text-gray-600">CNIC</th>
@@ -378,7 +394,12 @@ export default function BsAdmissionsPage() {
               </thead>
               <tbody>
                 {filtered.map((a, i) => (
-                  <tr key={a.id} className="border-b hover:bg-gray-50">
+                  <tr key={a.id} className={`border-b hover:bg-gray-50 transition-colors ${selectedIds.includes(a.id) ? "bg-blue-50/60" : ""}`}>
+                    <td className="px-3 py-3">
+                      <input type="checkbox" className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                        checked={selectedIds.includes(a.id)}
+                        onChange={() => toggleSelect(a.id)} />
+                    </td>
                     <td className="px-5 py-3 text-gray-400">{i + 1}</td>
                     <td className="px-5 py-3">
                       <button

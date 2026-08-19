@@ -11,7 +11,7 @@ function getGP(obtained: number, total: number): number {
   const rounded = Math.round(pct);
 
   if (rounded < 50) return 0.00; // Fail
-  if (rounded >= 80) return 4.00; // Max GP is 4.0
+  if (rounded >= 80) return 4.00; // Max GP is 4.0 
 
   return parseFloat((1.00 + (rounded - 50) * 0.10).toFixed(2));
 }
@@ -112,7 +112,7 @@ export default function AddResultPage() {
           setAllCoursesStatusList(data.allCoursesList || []);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   useEffect(() => {
@@ -132,6 +132,37 @@ export default function AddResultPage() {
       setPrograms(validProgs);
       setCourses(validCourses);
       setFetchingCourses(false);
+
+      // Check if URL parameters request a specific course or program/semester
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        const paramCourseId = urlParams.get("courseId");
+        const paramCourseTitle = urlParams.get("courseTitle");
+        const paramProgramId = urlParams.get("programId");
+        const paramSemester = urlParams.get("semester");
+        const paramSession = urlParams.get("session");
+
+        let targetC = null;
+        if (paramCourseId) {
+          targetC = validCourses.find((c: any) => c.id === paramCourseId);
+        } else if (paramCourseTitle) {
+          targetC = validCourses.find((c: any) => c.title?.toLowerCase() === paramCourseTitle.toLowerCase());
+        }
+
+        if (targetC) {
+          if (targetC.programId) setSelectedProgram(targetC.programId);
+          if (targetC.semester) setSelectedSemester(targetC.semester.toString());
+          if (targetC.session) setSelectedSession(targetC.session);
+          setSelectedCourse(targetC.id);
+          const totals: Record<number, number> = { 1: 33, 2: 67, 3: 100, 4: 100 };
+          setCourseTotalMarks(totals[targetC.creditHours] ?? 100);
+          return;
+        } else if (paramProgramId || paramSemester || paramSession) {
+          if (paramProgramId) setSelectedProgram(paramProgramId);
+          if (paramSemester) setSelectedSemester(paramSemester);
+          if (paramSession) setSelectedSession(paramSession);
+        }
+      }
 
       // Auto-select faculty's first assigned course on load
       const facultyAssignedCourses = validCourses.filter(c => {
@@ -576,22 +607,20 @@ export default function AddResultPage() {
       <div className="flex border-b border-gray-200 gap-2">
         <button
           onClick={() => setActiveTab("editor")}
-          className={`px-5 py-3 text-xs font-bold rounded-t-2xl border-t border-l border-r transition-all flex items-center gap-2 ${
-            activeTab === "editor"
-              ? "bg-white text-blue-600 border-gray-200 shadow-sm"
-              : "bg-gray-100 text-gray-500 hover:text-gray-900 border-transparent"
-          }`}
+          className={`px-5 py-3 text-xs font-bold rounded-t-2xl border-t border-l border-r transition-all flex items-center gap-2 ${activeTab === "editor"
+            ? "bg-white text-blue-600 border-gray-200 shadow-sm"
+            : "bg-gray-100 text-gray-500 hover:text-gray-900 border-transparent"
+            }`}
         >
           <span>✏️ Marks Entry & Calculator</span>
         </button>
 
         <button
           onClick={() => setActiveTab("history")}
-          className={`px-5 py-3 text-xs font-bold rounded-t-2xl border-t border-l border-r transition-all flex items-center gap-2 ${
-            activeTab === "history"
-              ? "bg-white text-blue-600 border-gray-200 shadow-sm"
-              : "bg-gray-100 text-gray-500 hover:text-gray-900 border-transparent"
-          }`}
+          className={`px-5 py-3 text-xs font-bold rounded-t-2xl border-t border-l border-r transition-all flex items-center gap-2 ${activeTab === "history"
+            ? "bg-white text-blue-600 border-gray-200 shadow-sm"
+            : "bg-gray-100 text-gray-500 hover:text-gray-900 border-transparent"
+            }`}
         >
           <span>📋 My Saved & Published Results List</span>
           <span className="px-2 py-0.5 text-[10px] bg-blue-100 text-blue-800 font-black rounded-full">
@@ -601,11 +630,10 @@ export default function AddResultPage() {
 
         <button
           onClick={() => setActiveTab("unlocks")}
-          className={`px-5 py-3 text-xs font-bold rounded-t-2xl border-t border-l border-r transition-all flex items-center gap-2 ${
-            activeTab === "unlocks"
-              ? "bg-white text-amber-700 border-gray-200 shadow-sm"
-              : "bg-gray-100 text-gray-500 hover:text-gray-900 border-transparent"
-          }`}
+          className={`px-5 py-3 text-xs font-bold rounded-t-2xl border-t border-l border-r transition-all flex items-center gap-2 ${activeTab === "unlocks"
+            ? "bg-white text-amber-700 border-gray-200 shadow-sm"
+            : "bg-gray-100 text-gray-500 hover:text-gray-900 border-transparent"
+            }`}
         >
           <span>📩 Unlock Requests Status</span>
           {metricCounts.unlockRequested > 0 && (
@@ -635,9 +663,8 @@ export default function AddResultPage() {
         </div>
 
         <div
-          className={`bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between cursor-pointer transition-all ${
-            metricCounts.unlockRequested > 0 ? "border-amber-400 bg-amber-50/40 ring-2 ring-amber-300" : "border-gray-100"
-          }`}
+          className={`bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between cursor-pointer transition-all ${metricCounts.unlockRequested > 0 ? "border-amber-400 bg-amber-50/40 ring-2 ring-amber-300" : "border-gray-100"
+            }`}
           onClick={() => isAdmin ? setAdminModalOpen(true) : setActiveTab("unlocks")}
         >
           <div>
@@ -692,11 +719,10 @@ export default function AddResultPage() {
                     <button
                       key={ac.id}
                       onClick={() => handleCourseChange(ac.id)}
-                      className={`px-3.5 py-2 text-xs font-bold rounded-xl border transition-all flex items-center gap-2 shadow-sm ${
-                        isSelected
-                          ? "bg-blue-600 text-white border-blue-600 ring-2 ring-blue-300 scale-[1.02]"
-                          : "bg-white text-gray-800 border-blue-200 hover:bg-blue-100 hover:text-blue-900"
-                      }`}
+                      className={`px-3.5 py-2 text-xs font-bold rounded-xl border transition-all flex items-center gap-2 shadow-sm ${isSelected
+                        ? "bg-blue-600 text-white border-blue-600 ring-2 ring-blue-300 scale-[1.02]"
+                        : "bg-white text-gray-800 border-blue-200 hover:bg-blue-100 hover:text-blue-900"
+                        }`}
                     >
                       <span>📚 {ac.title} ({ac.code})</span>
                       <span className={`px-2 py-0.5 text-[10px] rounded-md font-semibold ${isSelected ? "bg-blue-800 text-white" : "bg-blue-100 text-blue-800"}`}>
@@ -868,17 +894,15 @@ export default function AddResultPage() {
                 <div className="flex bg-white p-1 rounded-xl border border-purple-200 shadow-sm">
                   <button
                     onClick={() => setExamScheme("MID_FINAL")}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                      examScheme === "MID_FINAL" ? "bg-blue-600 text-white shadow" : "text-gray-600 hover:text-gray-900"
-                    }`}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${examScheme === "MID_FINAL" ? "bg-blue-600 text-white shadow" : "text-gray-600 hover:text-gray-900"
+                      }`}
                   >
                     Mid (30/20) + Final (40)
                   </button>
                   <button
                     onClick={() => setExamScheme("TERMINAL")}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                      examScheme === "TERMINAL" ? "bg-purple-600 text-white shadow" : "text-gray-600 hover:text-gray-900"
-                    }`}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${examScheme === "TERMINAL" ? "bg-purple-600 text-white shadow" : "text-gray-600 hover:text-gray-900"
+                      }`}
                   >
                     Single Terminal Exam (70)
                   </button>
@@ -898,11 +922,10 @@ export default function AddResultPage() {
                       <button
                         key={t.id}
                         onClick={() => setSelectedProgType(t.id)}
-                        className={`px-3 py-1 text-xs font-bold rounded-lg border transition-all ${
-                          selectedProgType === t.id
-                            ? "bg-blue-600 text-white border-blue-600"
-                            : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
-                        }`}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg border transition-all ${selectedProgType === t.id
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                          }`}
                       >
                         {t.label}
                       </button>
@@ -915,17 +938,15 @@ export default function AddResultPage() {
                   <div className="flex bg-gray-100 p-1 rounded-xl border">
                     <button
                       onClick={() => setEntryType("detailed")}
-                      className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                        entryType === "detailed" ? "bg-white text-blue-600 shadow" : "text-gray-600"
-                      }`}
+                      className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${entryType === "detailed" ? "bg-white text-blue-600 shadow" : "text-gray-600"
+                        }`}
                     >
                       Detailed Split ({examScheme === "TERMINAL" ? (isPracticalCourse ? "Quiz+Assign 5 / Prac 25 / Terminal 70" : "Quiz+Assign 30 / Terminal 70") : (isPracticalCourse ? "Quiz+Assign 15 / Prac 25 / Mid 20 / Final 40" : "Mid 30 / Final 40 / Quiz+Assign 30")})
                     </button>
                     <button
                       onClick={() => setEntryType("total")}
-                      className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                        entryType === "total" ? "bg-white text-blue-600 shadow" : "text-gray-600"
-                      }`}
+                      className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${entryType === "total" ? "bg-white text-blue-600 shadow" : "text-gray-600"
+                        }`}
                     >
                       Direct Total Marks
                     </button>
@@ -1040,9 +1061,8 @@ export default function AddResultPage() {
                                   onChange={(e) => handleMarkChange(st.id, "assignment", e.target.value)}
                                   disabled={isFacultyLocked || quizHasFullMarks}
                                   title={quizHasFullMarks ? `Quiz has taken full ${totalQuizAssignLimit} marks. Assignment auto-blocked!` : `Max allowed: ${Math.max(0, totalQuizAssignLimit - (st.quiz || 0))}`}
-                                  className={`w-16 px-2.5 py-1 border rounded-lg text-xs font-bold text-center ${
-                                    quizHasFullMarks ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" : "bg-white"
-                                  }`}
+                                  className={`w-16 px-2.5 py-1 border rounded-lg text-xs font-bold text-center ${quizHasFullMarks ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" : "bg-white"
+                                    }`}
                                 />
                               </td>
                               <td className="p-3">
@@ -1054,9 +1074,8 @@ export default function AddResultPage() {
                                   onChange={(e) => handleMarkChange(st.id, "quiz", e.target.value)}
                                   disabled={isFacultyLocked || assignHasFullMarks}
                                   title={assignHasFullMarks ? `Assignment has taken full ${totalQuizAssignLimit} marks. Quiz auto-blocked!` : `Max allowed: ${Math.max(0, totalQuizAssignLimit - (st.assignment || 0))}`}
-                                  className={`w-16 px-2.5 py-1 border rounded-lg text-xs font-bold text-center ${
-                                    assignHasFullMarks ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" : "bg-white"
-                                  }`}
+                                  className={`w-16 px-2.5 py-1 border rounded-lg text-xs font-bold text-center ${assignHasFullMarks ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" : "bg-white"
+                                    }`}
                                 />
                               </td>
                               {isPracticalCourse && (
@@ -1429,9 +1448,8 @@ export default function AddResultPage() {
                         <strong className="block text-sm text-gray-900">{req.courseTitle} ({req.courseCode})</strong>
                         <span className="text-xs text-blue-700 font-bold">{req.programName} — Faculty: {req.facultyName}</span>
                       </div>
-                      <span className={`px-2.5 py-1 text-xs rounded-full font-bold ${
-                        req.status === 'UNLOCK_REQUESTED' ? 'bg-amber-100 text-amber-800 animate-pulse' : 'bg-gray-200 text-gray-700'
-                      }`}>
+                      <span className={`px-2.5 py-1 text-xs rounded-full font-bold ${req.status === 'UNLOCK_REQUESTED' ? 'bg-amber-100 text-amber-800 animate-pulse' : 'bg-gray-200 text-gray-700'
+                        }`}>
                         {req.status}
                       </span>
                     </div>

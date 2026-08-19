@@ -16,6 +16,12 @@ export default function IntermediateStudentsPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleAll = (ids: string[]) =>
+    setSelectedIds(prev => prev.length === ids.length ? [] : ids);
 
   const blankForm = { name: "", email: "", password: "", rollNumber: "", educationLevel: "INTERMEDIATE", programId: "", groupId: "" };
   const [form, setForm] = useState(blankForm);
@@ -105,6 +111,11 @@ export default function IntermediateStudentsPage() {
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-3">
         <input className="flex-1 min-w-[200px] px-3 py-2 border rounded-lg text-sm" placeholder="🔍 Search name, email, roll..." value={search} onChange={e => setSearch(e.target.value)} />
         <span className="self-center text-sm text-gray-500">{filtered.length} Intermediate students</span>
+        {selectedIds.length > 0 && (
+          <span className="px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded-full self-center">
+            {selectedIds.length} selected
+          </span>
+        )}
       </div>
 
       {/* Table */}
@@ -114,6 +125,11 @@ export default function IntermediateStudentsPage() {
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-50 border-b">
                 <tr>
+                  <th className="px-3 py-3 w-10">
+                    <input type="checkbox" className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                      checked={selectedIds.length === filtered.length && filtered.length > 0}
+                      onChange={() => toggleAll(filtered.map(s => s.id))} />
+                  </th>
                   {["#","Name & Email","Roll No","Program","Group","Status","Actions"].map(h => (
                     <th key={h} className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">{h}</th>
                   ))}
@@ -121,7 +137,12 @@ export default function IntermediateStudentsPage() {
               </thead>
               <tbody>
                 {filtered.map((s, i) => (
-                  <tr key={s.id} className={`border-b hover:bg-gray-50 ${!s.isActive ? "opacity-60" : ""}`}>
+                  <tr key={s.id} className={`border-b hover:bg-gray-50 transition-colors ${!s.isActive ? "opacity-60" : ""} ${selectedIds.includes(s.id) ? "bg-blue-50/60" : ""}`}>
+                    <td className="px-3 py-3">
+                      <input type="checkbox" className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                        checked={selectedIds.includes(s.id)}
+                        onChange={() => toggleSelect(s.id)} />
+                    </td>
                     <td className="px-4 py-3 text-gray-400">{i+1}</td>
                     <td className="px-4 py-3"><div className="font-medium text-gray-900">{s.user?.name}</div><div className="text-xs text-gray-500">{s.user?.email}</div></td>
                     <td className="px-4 py-3 font-mono text-gray-700">{s.rollNumber}</td>

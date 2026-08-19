@@ -29,6 +29,12 @@ export default function UsersPage() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleAll = (ids: string[]) =>
+    setSelectedIds(prev => prev.length === ids.length ? [] : ids);
 
   useEffect(() => {
     fetchUsers();
@@ -125,6 +131,11 @@ export default function UsersPage() {
         <span className="text-sm text-gray-500">
           {filtered.length} / {users.length} users
         </span>
+        {selectedIds.length > 0 && (
+          <span className="px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded-full">
+            {selectedIds.length} selected
+          </span>
+        )}
       </div>
 
       {/* Table */}
@@ -136,6 +147,11 @@ export default function UsersPage() {
             <table className="w-full text-sm text-left">
               <thead>
                 <tr className="bg-gray-50 border-b">
+                  <th className="px-3 py-3 w-10">
+                    <input type="checkbox" className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                      checked={selectedIds.length === filtered.length && filtered.length > 0}
+                      onChange={() => toggleAll(filtered.map(u => u.id))} />
+                  </th>
                   <th className="px-5 py-3 font-semibold text-gray-600">#</th>
                   <th className="px-5 py-3 font-semibold text-gray-600">Name</th>
                   <th className="px-5 py-3 font-semibold text-gray-600">Email</th>
@@ -146,7 +162,12 @@ export default function UsersPage() {
               </thead>
               <tbody>
                 {filtered.map((u, i) => (
-                  <tr key={u.id} className="border-b hover:bg-gray-50 transition-colors">
+                  <tr key={u.id} className={`border-b hover:bg-gray-50 transition-colors ${selectedIds.includes(u.id) ? "bg-blue-50/60" : ""}`}>
+                    <td className="px-3 py-3">
+                      <input type="checkbox" className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                        checked={selectedIds.includes(u.id)}
+                        onChange={() => toggleSelect(u.id)} />
+                    </td>
                     <td className="px-5 py-3 text-gray-400">{i + 1}</td>
                     <td className="px-5 py-3 font-medium text-gray-900">{u.name}</td>
                     <td className="px-5 py-3 text-gray-600">{u.email}</td>
@@ -185,7 +206,7 @@ export default function UsersPage() {
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center py-10 text-gray-400">
+                    <td colSpan={7} className="text-center py-10 text-gray-400">
                       No users found.
                     </td>
                   </tr>

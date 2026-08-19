@@ -71,11 +71,40 @@ export default function BsFeesPage() {
   const [generated, setGenerated] = useState<Challan | null>(null);
   const [programs, setPrograms]   = useState<Program[]>([]);
 
+  // Add Fee Record modal
+  const [showFeeModal, setShowFeeModal] = useState(false);
+  const [feeStudents, setFeeStudents]   = useState<any[]>([]);
+  const [feeForm, setFeeForm] = useState({ studentId: "", amount: "", dueDate: new Date().toISOString().split("T")[0], feeType: "BS_SEMESTER", semester: "", educationLevel: "BS" });
+  const [savingFee, setSavingFee]       = useState(false);
+
   useEffect(() => {
     fetchChallans();
     fetch("/api/fee-settings").then(r => r.json()).then(d => setFeeTypes(Array.isArray(d) ? d : []));
     fetch("/api/public/programs").then(r => r.json()).then(d => setPrograms(Array.isArray(d) ? d : []));
+    fetch("/api/students?educationLevel=BS").then(r => r.json()).then(d => setFeeStudents(Array.isArray(d) ? d : []));
   }, []);
+
+  const handleAddFeeRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feeForm.studentId || !feeForm.amount || !feeForm.dueDate || !feeForm.feeType) return;
+    setSavingFee(true);
+    try {
+      const res = await fetch("/api/fees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...feeForm, amount: parseFloat(feeForm.amount), semester: feeForm.semester ? parseInt(feeForm.semester) : null }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMsg({ type: "success", text: `✅ Fee record created (Challan: ${data.challanNumber})` });
+        setShowFeeModal(false);
+        setFeeForm({ studentId: "", amount: "", dueDate: new Date().toISOString().split("T")[0], feeType: "BS_SEMESTER", semester: "", educationLevel: "BS" });
+      } else {
+        setMsg({ type: "error", text: data.error || "Failed to create fee record" });
+      }
+    } catch { setMsg({ type: "error", text: "Network error" }); }
+    finally { setSavingFee(false); }
+  };
 
   const fetchChallans = async () => {
     setLoading(true);
@@ -211,7 +240,7 @@ export default function BsFeesPage() {
           <h1 className="text-2xl font-bold text-gray-900">💰 BS Fees & Challans</h1>
           <p className="text-gray-500 mt-1">Generate challans and approve fee payments.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button onClick={() => { setTab("list"); setGenerated(null); }}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === "list" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
             📋 Challans List
@@ -219,6 +248,10 @@ export default function BsFeesPage() {
           <button onClick={() => setTab("generate")}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === "generate" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
             🧾 Generate Challan
+          </button>
+          <button onClick={() => setShowFeeModal(true)}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors">
+            + Add Fee Record
           </button>
         </div>
       </div>
@@ -593,6 +626,64 @@ export default function BsFeesPage() {
                 <p className="text-xs text-gray-400 italic">({toWords(getDisplayAmount(selectedFee))} rupees only)</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── ADD FEE RECORD MODAL ────────────────────────── */}
+      {showFeeModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md space-y-5 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-black text-slate-900">+ Add Fee Record</h2>
+            <p className="text-sm text-slate-500">Manually create a fee entry for a registered BS student.</p>
+            <form onSubmit={handleAddFeeRecord} className="space-y-4">
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase mb-1">Student *</label>
+                <select required className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  value={feeForm.studentId} onChange={e => setFeeForm(f => ({ ...f, studentId: e.target.value }))}>
+                  <option value="">— Select Student —</option>
+                  {feeStudents.map((s: any) => (
+                    <option key={s.id} value={s.id}>{s.rollNumber} — {s.user?.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-slate-500 uppercase mb-1">Fee Type *</label>
+                  <input required className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="e.g. BS_SEMESTER" value={feeForm.feeType}
+                    onChange={e => setFeeForm(f => ({ ...f, feeType: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-500 uppercase mb-1">Semester</label>
+                  <input type="number" min="1" max="8" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="1–8" value={feeForm.semester}
+                    onChange={e => setFeeForm(f => ({ ...f, semester: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-500 uppercase mb-1">Amount (Rs) *</label>
+                  <input required type="number" min="0" step="0.01" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="0.00" value={feeForm.amount}
+                    onChange={e => setFeeForm(f => ({ ...f, amount: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-500 uppercase mb-1">Due Date *</label>
+                  <input required type="date" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    value={feeForm.dueDate}
+                    onChange={e => setFeeForm(f => ({ ...f, dueDate: e.target.value }))} />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="submit" disabled={savingFee}
+                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-50">
+                  {savingFee ? "Creating..." : "Create Fee Record"}
+                </button>
+                <button type="button" onClick={() => setShowFeeModal(false)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-sm transition-all">
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

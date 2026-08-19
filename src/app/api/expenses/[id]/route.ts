@@ -6,9 +6,10 @@ import { checkPermission, MODULES, ACTIONS } from "@/lib/permissions";
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     
@@ -17,7 +18,7 @@ export async function GET(
     if (!canView) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const expense = await prisma.expense.findUnique({
-      where: { id: params.id, isActive: true },
+      where: { id, isActive: true },
       include: { department: true }
     });
 
@@ -30,9 +31,10 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     
@@ -44,7 +46,7 @@ export async function PUT(
     const { category, date, description, amount, vendorPayee, paymentMethod, departmentId, session: academicSession, receipt, status } = body;
 
     const expense = await prisma.expense.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         category,
         date: date ? new Date(date) : undefined,
@@ -68,9 +70,10 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     
@@ -80,7 +83,7 @@ export async function DELETE(
 
     // Financial Records -> Soft Delete
     await prisma.expense.update({
-      where: { id: params.id },
+      where: { id, isActive: true },
       data: { isActive: false, updatedBy: session.user?.email || "unknown" }
     });
 
