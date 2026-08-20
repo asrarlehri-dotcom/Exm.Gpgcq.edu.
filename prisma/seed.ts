@@ -174,28 +174,28 @@ async function main() {
     });
   }
 
-  // Seed Permissions
+  // Seed Permissions with createMany
+  const permData: { module: string; action: string; description: string }[] = [];
   for (const module of MODULES) {
     for (const action of ACTIONS) {
-      await prisma.permission.create({
-        data: { module, action, description: `${module} - ${action}` }
-      });
+      permData.push({ module, action, description: `${module} - ${action}` });
     }
   }
+  await prisma.permission.createMany({ data: permData, skipDuplicates: true });
 
   const allPerms = await prisma.permission.findMany();
+  const rolePermData: { role: string; permissionId: string; isGranted: boolean }[] = [];
   for (const [role, modulePerms] of Object.entries(DEFAULT_PERMISSIONS)) {
     for (const [module, actions] of Object.entries(modulePerms)) {
       for (const action of actions) {
         const p = allPerms.find(perm => perm.module === module && perm.action === action);
         if (p) {
-          await prisma.rolePermission.create({
-            data: { role, permissionId: p.id, isGranted: true }
-          });
+          rolePermData.push({ role, permissionId: p.id, isGranted: true });
         }
       }
     }
   }
+  await prisma.rolePermission.createMany({ data: rolePermData, skipDuplicates: true });
 
   // ─── 2. SYSTEM SETTINGS & SESSIONS ───────────────────────────────────────
   console.log("⚙️ Creating System Settings & Academic Sessions...");
@@ -209,9 +209,7 @@ async function main() {
     { key: "contact_phone", value: "+92 81 9201234" },
     { key: "address", value: "Zarghoon Road, Quetta, Balochistan, Pakistan" }
   ];
-  for (const s of sysSettings) {
-    await prisma.systemSetting.create({ data: s });
-  }
+  await prisma.systemSetting.createMany({ data: sysSettings, skipDuplicates: true });
 
   const sessions = [
     { name: "2024-2028", startDate: new Date("2024-09-01"), endDate: new Date("2028-06-30"), status: "ACTIVE" },
@@ -223,9 +221,7 @@ async function main() {
     { name: "2025-2027", startDate: new Date("2025-09-01"), endDate: new Date("2027-06-30"), status: "ACTIVE" },
     { name: "2026-2028", startDate: new Date("2026-09-01"), endDate: new Date("2028-06-30"), status: "ACTIVE" }
   ];
-  for (const sess of sessions) {
-    await prisma.academicSession.create({ data: sess });
-  }
+  await prisma.academicSession.createMany({ data: sessions, skipDuplicates: true });
 
   // ─── 3. DEPARTMENTS ──────────────────────────────────────────────────────
   console.log("🏛️ Creating Departments...");
