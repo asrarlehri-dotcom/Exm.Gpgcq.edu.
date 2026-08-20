@@ -42,11 +42,12 @@ next-env.d.ts
 
 /src/generated/prisma
 
-# SQLite database files
-*.db
+# SQLite database files (keep dev.db for Vercel deployment)
 *.db-journal
-*.sqlite
-*.sqlite3
+*.sqlite-journal
+!prisma/dev.db
+!dev.db
+!.env.example
 
 # Local environment variables
 .env.local
@@ -54,5 +55,3 @@ next-env.d.ts
 .env.test.local
 .env.production.local
 
-.vercel
-.env*
