@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-export const DEFAULT_HOMEPAGE_SETTINGS: Record<string, string> = {
+const DEFAULT_HOMEPAGE_SETTINGS: Record<string, string> = {
   // Navigation Header
   HOMEPAGE_HEADER_LOGO_TEXT: "GPCQ",
   HOMEPAGE_HEADER_LOGO_IMAGE: "/logo.png",

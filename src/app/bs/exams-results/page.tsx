@@ -156,7 +156,7 @@ function MarksEntryTable() {
           setUnlockRequestsList(data.summaryList || []);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   useEffect(() => {
@@ -206,7 +206,7 @@ function MarksEntryTable() {
           setSelectedCourse(firstProgCourses[0].id);
         }
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, [session?.user?.email]);
 
   // Available courses filtered by program and semester
@@ -748,18 +748,16 @@ function MarksEntryTable() {
               <button
                 type="button"
                 onClick={() => setExamScheme("MID_FINAL")}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                  examScheme === "MID_FINAL" ? "bg-blue-600 text-white shadow" : "text-gray-600 hover:text-gray-900"
-                }`}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${examScheme === "MID_FINAL" ? "bg-blue-600 text-white shadow" : "text-gray-600 hover:text-gray-900"
+                  }`}
               >
                 Mid (30/20) + Final (40)
               </button>
               <button
                 type="button"
                 onClick={() => setExamScheme("TERMINAL")}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                  examScheme === "TERMINAL" ? "bg-purple-600 text-white shadow" : "text-gray-600 hover:text-gray-900"
-                }`}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${examScheme === "TERMINAL" ? "bg-purple-600 text-white shadow" : "text-gray-600 hover:text-gray-900"
+                  }`}
               >
                 Single Terminal Exam (70)
               </button>
@@ -860,9 +858,8 @@ function MarksEntryTable() {
                                 step="0.5"
                                 disabled={isFacultyLocked || quizHasFullMarks}
                                 title={quizHasFullMarks ? `Quiz has taken full ${totalQuizAssignLimit} marks. Assignment auto-blocked!` : `Max allowed: ${Math.max(0, totalQuizAssignLimit - (s.quiz || 0))}`}
-                                className={`w-20 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-400 ${
-                                  quizHasFullMarks ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" : ""
-                                }`}
+                                className={`w-20 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-400 ${quizHasFullMarks ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" : ""
+                                  }`}
                                 value={quizHasFullMarks ? 0 : (s.assignment || "")}
                                 onChange={e => handleMarkChange(s.id, "assignment", e.target.value)}
                               />
@@ -875,9 +872,8 @@ function MarksEntryTable() {
                                 step="0.5"
                                 disabled={isFacultyLocked || assignHasFullMarks}
                                 title={assignHasFullMarks ? `Assignment has taken full ${totalQuizAssignLimit} marks. Quiz auto-blocked!` : `Max allowed: ${Math.max(0, totalQuizAssignLimit - (s.assignment || 0))}`}
-                                className={`w-20 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-400 ${
-                                  assignHasFullMarks ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" : ""
-                                }`}
+                                className={`w-20 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-400 ${assignHasFullMarks ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" : ""
+                                  }`}
                                 value={assignHasFullMarks ? 0 : (s.quiz || "")}
                                 onChange={e => handleMarkChange(s.id, "quiz", e.target.value)}
                               />
@@ -894,9 +890,8 @@ function MarksEntryTable() {
                                 max="30"
                                 step="0.5"
                                 disabled={isFacultyLocked || examScheme === "TERMINAL"}
-                                className={`w-20 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-400 ${
-                                  examScheme === "TERMINAL" ? "bg-gray-100 text-gray-400 cursor-not-allowed font-bold" : ""
-                                }`}
+                                className={`w-20 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-400 ${examScheme === "TERMINAL" ? "bg-gray-100 text-gray-400 cursor-not-allowed font-bold" : ""
+                                  }`}
                                 value={examScheme === "TERMINAL" ? 0 : (s.mid || "")}
                                 onChange={e => handleMarkChange(s.id, "mid", e.target.value)}
                               />
@@ -908,9 +903,8 @@ function MarksEntryTable() {
                                 max={examScheme === "TERMINAL" ? 70 : 40}
                                 step="0.5"
                                 disabled={isFacultyLocked}
-                                className={`w-20 px-2 py-1 border rounded text-sm focus:ring-2 text-center disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                                  examScheme === "TERMINAL" ? "border-purple-400 font-black text-purple-950 focus:ring-purple-500 shadow-sm bg-white" : "focus:ring-blue-400"
-                                }`}
+                                className={`w-20 px-2 py-1 border rounded text-sm focus:ring-2 text-center disabled:bg-gray-100 disabled:cursor-not-allowed ${examScheme === "TERMINAL" ? "border-purple-400 font-black text-purple-950 focus:ring-purple-500 shadow-sm bg-white" : "focus:ring-blue-400"
+                                  }`}
                                 value={s.final || ""}
                                 onChange={e => handleMarkChange(s.id, "final", e.target.value)}
                               />
@@ -1098,9 +1092,8 @@ function MarksEntryTable() {
                         <strong className="block text-sm text-gray-900">{req.courseTitle} ({req.courseCode})</strong>
                         <span className="text-xs text-blue-700 font-bold">{req.programName} — Faculty: {req.facultyName}</span>
                       </div>
-                      <span className={`px-2.5 py-1 text-xs rounded-full font-bold ${
-                        req.status === 'UNLOCK_REQUESTED' ? 'bg-amber-100 text-amber-800 animate-pulse' : 'bg-gray-200 text-gray-700'
-                      }`}>
+                      <span className={`px-2.5 py-1 text-xs rounded-full font-bold ${req.status === 'UNLOCK_REQUESTED' ? 'bg-amber-100 text-amber-800 animate-pulse' : 'bg-gray-200 text-gray-700'
+                        }`}>
                         {req.status}
                       </span>
                     </div>
@@ -1210,7 +1203,7 @@ function MeritScholarshipsTab() {
         s.currentCgpa.toFixed(2), s.totalCgpa.toFixed(2)
       ].join(","))
     ].join("\n");
-    
+
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
@@ -1235,14 +1228,14 @@ function MeritScholarshipsTab() {
           <p className="text-gray-500 text-sm print:hidden">Generate lists of top performers eligible for scholarships or honors.</p>
         </div>
         <div className="flex gap-3 print:hidden">
-          <button 
+          <button
             onClick={() => window.print()}
             className="flex items-center gap-2 px-4 py-2 border border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg text-sm font-medium transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
             Print / Save as PDF
           </button>
-          <button 
+          <button
             onClick={handleExportCSV}
             className="flex items-center gap-2 px-4 py-2 border border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg text-sm font-medium transition-colors"
           >
