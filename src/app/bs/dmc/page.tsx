@@ -149,15 +149,26 @@ export default function DMCGeneratorPage() {
             </thead>
             <tbody>
               {currentDMCData.map((m, idx) => {
-                const gp = getGPValue(m.obtainedMarks, m.totalMarks);
+                const isAbsent = (m as any).status === "ABSENT" || (m as any).status === "A";
+                const gp = isAbsent ? 0.0 : getGPValue(m.obtainedMarks, m.totalMarks);
                 return (
-                  <tr key={idx} className="border-b">
+                  <tr key={idx} className={`border-b ${isAbsent ? "bg-red-50/30" : ""}`}>
                     <td className="p-3 font-mono text-xs">{m.course?.code || "CS-101"}</td>
                     <td className="p-3 font-semibold text-gray-800">{m.course?.title}</td>
                     <td className="p-3 text-center">{m.course?.creditHours || 3}</td>
-                    <td className="p-3 text-center">{m.obtainedMarks}</td>
+                    <td className="p-3 text-center">
+                      {isAbsent ? (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 font-black rounded text-xs border border-red-200">
+                          A (ABSENT)
+                        </span>
+                      ) : (
+                        m.obtainedMarks
+                      )}
+                    </td>
                     <td className="p-3 text-center">{m.totalMarks}</td>
-                    <td className="p-3 text-center font-bold text-blue-700">{gp.toFixed(2)}</td>
+                    <td className={`p-3 text-center font-bold ${isAbsent ? "text-red-600" : "text-blue-700"}`}>
+                      {gp.toFixed(2)}
+                    </td>
                   </tr>
                 );
               })}

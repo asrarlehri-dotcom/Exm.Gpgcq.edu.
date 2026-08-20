@@ -142,12 +142,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const assignment = parseFloat(assignmentMarks || 0);
-    const quiz = parseFloat(quizMarks || 0);
-    const practical = parseFloat(practicalMarks || 0);
-    const midterm = parseFloat(midtermMarks || 0);
-    const final = parseFloat(finalMarks || 0);
-    const obtained = assignment + quiz + practical + midterm + final;
+    const isAbsent = status === "ABSENT";
+    const assignment = isAbsent ? 0 : parseFloat(assignmentMarks || 0);
+    const quiz = isAbsent ? 0 : parseFloat(quizMarks || 0);
+    const practical = isAbsent ? 0 : parseFloat(practicalMarks || 0);
+    const midterm = isAbsent ? 0 : parseFloat(midtermMarks || 0);
+    const final = isAbsent ? 0 : parseFloat(finalMarks || 0);
+    const obtained = isAbsent ? 0 : (assignment + quiz + practical + midterm + final);
     const total = parseFloat(totalMarks || 100);
 
     const dataPayload: any = {
@@ -158,6 +159,7 @@ export async function POST(req: NextRequest) {
       finalMarks: final,
       obtainedMarks: obtained,
       totalMarks: total,
+      status: status || "SAVED",
       ...(isLocked !== undefined && { isLocked: Boolean(isLocked) }),
     };
 
@@ -185,6 +187,33 @@ export async function POST(req: NextRequest) {
       } catch {
         // Ignored if column doesn't exist
       }
+    }
+
+    // Also record / sync paper attendance in Attendance table
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const existingAttendance = await prisma.attendance.findFirst({
+        where: { studentId, courseId, date: today }
+      });
+      if (existingAttendance) {
+        await prisma.attendance.update({
+          where: { id: existingAttendance.id },
+          data: { status: isAbsent ? "ABSENT" : "PRESENT" }
+        });
+      } else {
+        await prisma.attendance.create({
+          data: {
+            studentId,
+            courseId,
+            date: today,
+            status: isAbsent ? "ABSENT" : "PRESENT",
+            educationLevel: "BS"
+          }
+        });
+      }
+    } catch {
+      // Attendance sync fallback
     }
 
     return NextResponse.json(marksRecord, { status: 200 });

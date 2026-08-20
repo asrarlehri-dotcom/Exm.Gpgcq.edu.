@@ -163,14 +163,19 @@ export default function TranscriptGeneratorPage() {
                   <span className="text-xs font-bold text-blue-600">GPA: {semData.gpa.toFixed(2)}</span>
                 </div>
                 <div className="space-y-1 text-xs">
-                  {semData.marks.map((m, i) => (
-                    <div key={i} className="flex justify-between text-gray-700">
-                      <span className="truncate max-w-[180px]">{m.course?.title}</span>
-                      <span className="font-mono text-gray-400">
-                        {m.obtainedMarks}/{m.totalMarks} (GP: {getGPValue(m.obtainedMarks, m.totalMarks).toFixed(2)})
-                      </span>
-                    </div>
-                  ))}
+                  {semData.marks.map((m, i) => {
+                    const isAbsent = (m as any).status === "ABSENT" || (m as any).status === "A";
+                    return (
+                      <div key={i} className={`flex justify-between ${isAbsent ? "text-red-700 font-bold" : "text-gray-700"}`}>
+                        <span className="truncate max-w-[180px]">
+                          {m.course?.title} {isAbsent && <span className="text-[10px] text-red-600 font-extrabold">(Absent)</span>}
+                        </span>
+                        <span className={`font-mono ${isAbsent ? "text-red-600 font-bold" : "text-gray-400"}`}>
+                          {isAbsent ? "A / " + m.totalMarks + " (GP: 0.00)" : `${m.obtainedMarks}/${m.totalMarks} (GP: ${getGPValue(m.obtainedMarks, m.totalMarks).toFixed(2)})`}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}

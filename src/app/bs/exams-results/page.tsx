@@ -4,37 +4,68 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 
 export default function ExamsResultsPage() {
-  const [activeTab, setActiveTab] = useState("marks");
+  const [activeTab, setActiveTab] = useState("paper_attendance");
+  const [sharedFilters, setSharedFilters] = useState({
+    session: "2024-2028",
+    programId: "",
+    semester: "1",
+    courseId: "",
+    progType: "ALL",
+  });
 
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 print:hidden">
         <h1 className="text-2xl font-bold text-gray-900">Examinations & Results</h1>
-        <p className="text-gray-500 mt-1">Manage Marks Entry, Result Compilation, and Student Promotions.</p>
+        <p className="text-gray-500 mt-1">Manage Exam Paper Attendance, Student Marks Entry, Result Compilation, and Promotions.</p>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:border-none print:shadow-none">
-        <div className="flex border-b print:hidden">
+        <div className="flex border-b print:hidden overflow-x-auto bg-slate-50/50">
           <button
-            className={`px-6 py-4 font-medium text-sm ${activeTab === 'marks' ? 'border-b-2 border-blue-600 text-blue-600 font-bold' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`px-6 py-4 font-medium text-sm whitespace-nowrap transition-all flex items-center gap-2 ${
+              activeTab === 'paper_attendance'
+                ? 'border-b-2 border-blue-600 text-blue-700 font-black bg-white shadow-sm'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/60'
+            }`}
+            onClick={() => setActiveTab('paper_attendance')}
+          >
+            <span>📋 Paper Attendance</span>
+            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-800">Step 1</span>
+          </button>
+
+          <button
+            className={`px-6 py-4 font-medium text-sm whitespace-nowrap transition-all flex items-center gap-2 ${
+              activeTab === 'marks'
+                ? 'border-b-2 border-blue-600 text-blue-700 font-black bg-white shadow-sm'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/60'
+            }`}
             onClick={() => setActiveTab('marks')}
           >
-            Marks Entry
+            <span>📝 Marks Entry</span>
+            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-100 text-indigo-800">Step 2</span>
           </button>
+
           <button
-            className={`px-6 py-4 font-medium text-sm ${activeTab === 'results' ? 'border-b-2 border-blue-600 text-blue-600 font-bold' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`px-6 py-4 font-medium text-sm whitespace-nowrap ${
+              activeTab === 'results' ? 'border-b-2 border-blue-600 text-blue-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'
+            }`}
             onClick={() => setActiveTab('results')}
           >
             Results & Promotion
           </button>
           <button
-            className={`px-6 py-4 font-medium text-sm ${activeTab === 'academic_actions' ? 'border-b-2 border-blue-600 text-blue-600 font-bold' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`px-6 py-4 font-medium text-sm whitespace-nowrap ${
+              activeTab === 'academic_actions' ? 'border-b-2 border-blue-600 text-blue-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'
+            }`}
             onClick={() => setActiveTab('academic_actions')}
           >
             🔀 Status & Academic Actions
           </button>
           <button
-            className={`px-6 py-4 font-medium text-sm ${activeTab === 'merit' ? 'border-b-2 border-blue-600 text-blue-600 font-bold' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`px-6 py-4 font-medium text-sm whitespace-nowrap ${
+              activeTab === 'merit' ? 'border-b-2 border-blue-600 text-blue-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'
+            }`}
             onClick={() => setActiveTab('merit')}
           >
             Merit & Scholarships
@@ -42,8 +73,20 @@ export default function ExamsResultsPage() {
         </div>
 
         <div className="p-6">
+          {activeTab === 'paper_attendance' && (
+            <PaperAttendanceModule
+              sharedFilters={sharedFilters}
+              setSharedFilters={setSharedFilters}
+              onProceedToMarks={() => setActiveTab('marks')}
+            />
+          )}
+
           {activeTab === 'marks' && (
-            <MarksEntryTable />
+            <MarksEntryTable
+              sharedFilters={sharedFilters}
+              setSharedFilters={setSharedFilters}
+              onEditAttendance={() => setActiveTab('paper_attendance')}
+            />
           )}
 
           {activeTab === 'results' && (
@@ -106,11 +149,16 @@ function getGrade(obtained: number, total: number): string {
   return "F";
 }
 
-function MarksEntryTable() {
+function PaperAttendanceModule({
+  sharedFilters,
+  setSharedFilters,
+  onProceedToMarks,
+}: {
+  sharedFilters: { session: string; programId: string; semester: string; courseId: string; progType: string };
+  setSharedFilters: React.Dispatch<React.SetStateAction<{ session: string; programId: string; semester: string; courseId: string; progType: string }>>;
+  onProceedToMarks: () => void;
+}) {
   const { data: session } = useSession();
-  const [entryType, setEntryType] = useState<"detailed" | "total">("detailed");
-
-  // Search & Filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [programs, setPrograms] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
@@ -118,11 +166,516 @@ function MarksEntryTable() {
     "2024-2028", "2025-2029", "2026-2030", "2023-2027", "2022-2026",
     "2024-2026", "2025-2027", "2026-2028", "2023-2025", "2022-2024"
   ]);
-  const [selectedProgType, setSelectedProgType] = useState("ALL");
-  const [selectedSession, setSelectedSession] = useState("2024-2028");
-  const [selectedProgram, setSelectedProgram] = useState("");
-  const [selectedSemester, setSelectedSemester] = useState("2");
-  const [selectedCourse, setSelectedCourse] = useState("");
+
+  const [selectedProgType, setSelectedProgType] = useState(sharedFilters.progType || "ALL");
+  const [selectedSession, setSelectedSession] = useState(sharedFilters.session || "2024-2028");
+  const [selectedProgram, setSelectedProgram] = useState(sharedFilters.programId || "");
+  const [selectedSemester, setSelectedSemester] = useState(sharedFilters.semester || "1");
+  const [selectedCourse, setSelectedCourse] = useState(sharedFilters.courseId || "");
+
+  const [students, setStudents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const userRole = (session?.user as any)?.role || "";
+  const isAdmin = ["SUPER_ADMIN", "ADMIN", "BS_CONTROLLER"].includes(userRole);
+
+  // Sync to parent sharedFilters whenever filter changes
+  useEffect(() => {
+    setSharedFilters({
+      session: selectedSession,
+      programId: selectedProgram,
+      semester: selectedSemester,
+      courseId: selectedCourse,
+      progType: selectedProgType,
+    });
+  }, [selectedSession, selectedProgram, selectedSemester, selectedCourse, selectedProgType]);
+
+  // Load programs, courses & sessions from API
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/programs").then(r => r.ok ? r.json() : []),
+      fetch("/api/courses").then(r => r.ok ? r.json() : []),
+      fetch("/api/settings").then(r => r.ok ? r.json() : {})
+    ]).then(async ([pData, cData, sData]) => {
+      const validProgs = Array.isArray(pData) ? pData.filter((p: any) => p.educationLevel === "BS" || !p.educationLevel) : [];
+      const validCourses = Array.isArray(cData) ? cData : [];
+
+      const settingsObj = (sData as any) || {};
+      if (settingsObj.ACADEMIC_SESSIONS) {
+        const { filterValidSessions } = await import("@/lib/sessionHelper");
+        const validList = filterValidSessions(settingsObj.ACADEMIC_SESSIONS);
+        setSessions(validList);
+        if (validList.length > 0 && !validList.includes(selectedSession)) {
+          setSelectedSession(validList[0]);
+        }
+      }
+
+      setPrograms(validProgs);
+      setCourses(validCourses);
+
+      const userEmail = session?.user?.email;
+      const facultyAssignedCourse = validCourses.find((c: any) =>
+        c.faculty?.user?.email && userEmail && c.faculty.user.email.toLowerCase() === userEmail.toLowerCase()
+      );
+
+      if (facultyAssignedCourse) {
+        setSelectedProgram(facultyAssignedCourse.programId);
+        setSelectedSemester(facultyAssignedCourse.semester?.toString() || "1");
+        setSelectedCourse(facultyAssignedCourse.id);
+      } else if (validProgs.length > 0 && !selectedProgram) {
+        const firstProgId = validProgs[0].id;
+        setSelectedProgram(firstProgId);
+        const firstProgCourses = validCourses.filter((c: any) => c.programId === firstProgId);
+        if (firstProgCourses.length > 0) {
+          setSelectedSemester(firstProgCourses[0].semester?.toString() || "1");
+          setSelectedCourse(firstProgCourses[0].id);
+        }
+      }
+    }).catch(() => { });
+  }, [session?.user?.email]);
+
+  // Available courses filtered by program and semester
+  const filteredCourses = courses.filter(c => {
+    if (selectedProgram && c.programId !== selectedProgram) return false;
+    if (selectedSemester && c.semester !== parseInt(selectedSemester)) return false;
+    return true;
+  });
+
+  // Auto-switch course if selectedProgram / selectedSemester changes and current course is invalid
+  useEffect(() => {
+    if (filteredCourses.length > 0 && !filteredCourses.some(c => c.id === selectedCourse)) {
+      setSelectedCourse(filteredCourses[0].id);
+    }
+  }, [selectedProgram, selectedSemester, courses]);
+
+  // Fetch students & their attendance/marks for the selected course & session
+  useEffect(() => {
+    if (!selectedCourse) {
+      setStudents([]);
+      return;
+    }
+
+    setLoading(true);
+    setSuccessMsg("");
+    setErrorMsg("");
+
+    const queryParams = new URLSearchParams();
+    queryParams.set("educationLevel", "BS");
+    if (selectedProgram) queryParams.set("programId", selectedProgram);
+    if (selectedSession && selectedSession !== "ALL") queryParams.set("session", selectedSession);
+    if (selectedSemester) queryParams.set("currentSemester", selectedSemester);
+
+    Promise.all([
+      fetch(`/api/students?${queryParams}`).then(r => r.ok ? r.json() : []),
+      fetch(`/api/marks?courseId=${selectedCourse}`).then(r => r.ok ? r.json() : [])
+    ]).then(([sData, mData]) => {
+      const studentList = Array.isArray(sData) ? sData : [];
+      const marksArr = Array.isArray(mData) ? mData : [];
+
+      const mapped = studentList.map((st: any) => {
+        const existing = marksArr.find((m: any) => m.studentId === st.id);
+        const isAbsent = existing?.status === "ABSENT" || existing?.status === "A";
+        return {
+          id: st.id,
+          name: st.user?.name || st.name || "Student",
+          roll: st.rollNumber || st.roll || "N/A",
+          session: st.session || "",
+          currentSemester: st.currentSemester || 1,
+          bsAdmissionType: st.bsAdmissionType || "REGULAR",
+          attendance: isAbsent ? "ABSENT" : "PRESENT",
+          marksRecord: existing || null,
+        };
+      });
+
+      setStudents(mapped);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [selectedCourse, selectedProgram, selectedSession, selectedSemester]);
+
+  const toggleStudentAttendance = (id: string, newStatus: "PRESENT" | "ABSENT") => {
+    setStudents(students.map(s => (s.id === id ? { ...s, attendance: newStatus } : s)));
+  };
+
+  const markAllAttendance = (status: "PRESENT" | "ABSENT") => {
+    setStudents(students.map(s => ({ ...s, attendance: status })));
+  };
+
+  // Save Attendance & Sync Absent status to Marks table
+  const handleSaveAttendance = async () => {
+    if (!selectedCourse) return alert("Please select a course first.");
+    if (students.length === 0) return alert("No students found to save attendance.");
+
+    setSaving(true);
+    setSuccessMsg("");
+    setErrorMsg("");
+
+    let successCount = 0;
+    let lastError = "";
+
+    for (const s of students) {
+      const isAbsent = s.attendance === "ABSENT";
+      try {
+        const res = await fetch("/api/marks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            studentId: s.id,
+            courseId: selectedCourse,
+            assignmentMarks: isAbsent ? 0 : (s.marksRecord?.assignmentMarks || 0),
+            quizMarks: isAbsent ? 0 : (s.marksRecord?.quizMarks || 0),
+            practicalMarks: isAbsent ? 0 : (s.marksRecord?.practicalMarks || 0),
+            midtermMarks: isAbsent ? 0 : (s.marksRecord?.midtermMarks || 0),
+            finalMarks: isAbsent ? 0 : (s.marksRecord?.finalMarks || 0),
+            totalMarks: s.marksRecord?.totalMarks || 100,
+            status: isAbsent ? "ABSENT" : (s.marksRecord?.status || "SAVED"),
+          })
+        });
+        if (res.ok) {
+          successCount++;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          lastError = errData.error || "Failed to save";
+        }
+      } catch (err: any) {
+        lastError = err.message;
+      }
+    }
+
+    setSaving(false);
+    if (successCount > 0) {
+      setSuccessMsg(`✅ Exam Paper Attendance saved successfully (${students.filter(s => s.attendance === "ABSENT").length} Absent, ${students.filter(s => s.attendance !== "ABSENT").length} Present)!`);
+    } else {
+      setErrorMsg(lastError ? `Failed to save attendance: ${lastError}` : "Error saving attendance.");
+    }
+  };
+
+  // Filter student list by search & type & session
+  const filteredStudentsList = students.filter(st => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchName = st.name.toLowerCase().includes(q);
+      const matchRoll = st.roll.toLowerCase().includes(q);
+      if (!matchName && !matchRoll) return false;
+    }
+    if (selectedSession && selectedSession !== "ALL" && st.session && st.session !== selectedSession) {
+      return false;
+    }
+    if (selectedProgType === "ALL") return true;
+    if (selectedProgType === "REGULAR") return st.bsAdmissionType === "REGULAR" || !st.bsAdmissionType;
+    if (selectedProgType === "BRIDGING") return st.bsAdmissionType === "BRIDGING_5TH";
+    if (selectedProgType === "MIGRATION") return st.bsAdmissionType === "MIGRATION";
+    return true;
+  });
+
+  const presentCount = students.filter(s => s.attendance !== "ABSENT").length;
+  const absentCount = students.filter(s => s.attendance === "ABSENT").length;
+  const currentSelectedCourse = courses.find(c => c.id === selectedCourse);
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
+            <span>📋 Step 1: Exam Paper Attendance</span>
+            <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-800">Mandatory</span>
+          </h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Mark student exam paper presence before entering marks. Absent students will be locked in Marks Entry and displayed as <strong>'A'</strong>.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onProceedToMarks}
+            className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black rounded-xl shadow-md transition-all flex items-center gap-2"
+          >
+            <span>📝 Proceed to Marks Entry (Step 2)</span>
+            <span>➡️</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Filters Bar */}
+      <div className="space-y-3 bg-gray-50 p-4 rounded-2xl border border-gray-200 shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">Search Student</label>
+            <input
+              type="text"
+              className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-bold focus:ring-2 focus:ring-blue-400"
+              placeholder="🔍 Search name or roll number..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">Program Type</label>
+            <select
+              className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-bold focus:ring-2 focus:ring-blue-400"
+              value={selectedProgType}
+              onChange={e => setSelectedProgType(e.target.value)}
+            >
+              <option value="ALL">All Types</option>
+              <option value="REGULAR">BS Regular</option>
+              <option value="BRIDGING">BS 5th / Bridging</option>
+              <option value="MIGRATION">Migration</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">Academic Session</label>
+            <select
+              className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-bold focus:ring-2 focus:ring-blue-400 text-blue-900"
+              value={selectedSession}
+              onChange={e => setSelectedSession(e.target.value)}
+            >
+              <option value="ALL">All Sessions</option>
+              {sessions.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">Degree Program</label>
+            <select
+              className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-bold focus:ring-2 focus:ring-blue-400"
+              value={selectedProgram}
+              onChange={e => {
+                setSelectedProgram(e.target.value);
+                setSelectedCourse("");
+              }}
+            >
+              <option value="">-- Select Program --</option>
+              {programs.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">Semester</label>
+            <select
+              className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-bold focus:ring-2 focus:ring-blue-400"
+              value={selectedSemester}
+              onChange={e => {
+                setSelectedSemester(e.target.value);
+                setSelectedCourse("");
+              }}
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
+                <option key={s} value={s}>Semester {s}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">Select Exam Course *</label>
+          <select
+            className={`w-full px-3 py-2 border rounded-xl bg-white text-xs font-bold focus:ring-2 focus:ring-blue-400 ${!selectedProgram ? 'opacity-60 cursor-not-allowed' : ''}`}
+            value={selectedCourse}
+            onChange={e => setSelectedCourse(e.target.value)}
+          >
+            <option value="">-- Select Course --</option>
+            {filteredCourses.map(c => {
+              const creditFmt = c.creditHoursFormat || `${c.creditHours}(${c.creditHours}-0)`;
+              return (
+                <option key={c.id} value={c.id}>
+                  {c.title} ({c.code}) — {creditFmt} Cr
+                </option>
+              );
+            })}
+          </select>
+        </div>
+      </div>
+
+      {successMsg && <div className="bg-green-50 text-green-700 p-4 rounded-xl text-xs font-bold border border-green-200">{successMsg}</div>}
+      {errorMsg && <div className="bg-red-50 text-red-700 p-4 rounded-xl text-xs font-bold border border-red-200">{errorMsg}</div>}
+
+      {/* Attendance Stats & Quick Actions */}
+      <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 p-4 rounded-2xl flex items-center justify-between flex-wrap gap-4 shadow-sm">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">📋</span>
+          <div>
+            <h4 className="text-xs font-black uppercase text-blue-950 tracking-wider">
+              Exam Attendance Sheet {currentSelectedCourse ? `— ${currentSelectedCourse.title} (${currentSelectedCourse.code})` : ""}
+            </h4>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="px-2.5 py-0.5 rounded-lg bg-white border border-gray-200 text-xs font-bold text-gray-700">
+                Total: <strong>{students.length}</strong>
+              </span>
+              <span className="px-2.5 py-0.5 rounded-lg bg-green-100 border border-green-300 text-xs font-black text-green-800">
+                Present: <strong>{presentCount}</strong>
+              </span>
+              <span className="px-2.5 py-0.5 rounded-lg bg-red-100 border border-red-300 text-xs font-black text-red-800">
+                Absent (A): <strong>{absentCount}</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => markAllAttendance("PRESENT")}
+            className="px-3.5 py-2 bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5"
+          >
+            <span>✅ Mark All Present</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => markAllAttendance("ABSENT")}
+            className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5"
+          >
+            <span>❌ Mark All Absent (A)</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Attendance Sheet Table */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="text-center py-12 text-gray-400 font-bold">⏳ Loading enrolled students...</div>
+          ) : filteredStudentsList.length === 0 ? (
+            <div className="text-center py-12 text-gray-500 font-medium">
+              <div className="text-3xl mb-2">🚫</div>
+              <p className="font-bold">No students found matching current filters.</p>
+              <p className="text-xs text-gray-400 mt-1">Please select Program, Semester, Session, and Course above.</p>
+            </div>
+          ) : (
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="bg-gray-100/80 border-b text-gray-700 font-black uppercase tracking-wider">
+                <tr>
+                  <th className="p-3.5 text-center w-12">#</th>
+                  <th className="p-3.5">Student Roll & Name</th>
+                  <th className="p-3.5">Session & Admission Mode</th>
+                  <th className="p-3.5 text-center">Paper Attendance Status</th>
+                  <th className="p-3.5 text-center">Marks Entry Lock Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredStudentsList.map((st, idx) => {
+                  const isAbsent = st.attendance === "ABSENT";
+                  return (
+                    <tr key={st.id} className={`transition-colors ${isAbsent ? "bg-red-50/30" : "hover:bg-gray-50/60"}`}>
+                      <td className="p-3.5 text-center font-bold text-gray-400">{idx + 1}</td>
+                      <td className="p-3.5">
+                        <strong className="block text-gray-900 font-extrabold text-sm">{st.name}</strong>
+                        <span className="font-mono text-gray-500 text-xs">{st.roll}</span>
+                      </td>
+                      <td className="p-3.5">
+                        <span className="font-bold text-slate-700">{st.session || selectedSession}</span>
+                        {st.bsAdmissionType === "BRIDGING_5TH" && (
+                          <span className="ml-2 px-2 py-0.5 text-[10px] bg-purple-100 text-purple-700 font-bold rounded-full">Bridging 5th</span>
+                        )}
+                      </td>
+                      <td className="p-3.5 text-center">
+                        <div className="inline-flex rounded-xl border border-gray-300 p-1 bg-gray-100 shadow-sm">
+                          <button
+                            type="button"
+                            onClick={() => toggleStudentAttendance(st.id, "PRESENT")}
+                            className={`px-4 py-1.5 text-xs font-extrabold rounded-lg transition-all ${
+                              !isAbsent
+                                ? "bg-green-600 text-white shadow-md scale-[1.02]"
+                                : "text-gray-600 hover:text-gray-900"
+                            }`}
+                          >
+                            🟢 Present (P)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleStudentAttendance(st.id, "ABSENT")}
+                            className={`px-4 py-1.5 text-xs font-black rounded-lg transition-all ${
+                              isAbsent
+                                ? "bg-red-600 text-white shadow-md scale-[1.02]"
+                                : "text-gray-600 hover:text-gray-900"
+                            }`}
+                          >
+                            🔴 Absent (A)
+                          </button>
+                        </div>
+                      </td>
+                      <td className="p-3.5 text-center">
+                        {isAbsent ? (
+                          <span className="px-3 py-1 text-xs rounded-full font-black bg-red-100 text-red-800 border border-red-200">
+                            🔒 Locked (Marked 'A' / 0 Marks)
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1 text-xs rounded-full font-bold bg-green-100 text-green-800 border border-green-200">
+                            🟢 Marks Entry Open
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        <div className="p-4 bg-gray-50 border-t flex justify-between items-center flex-wrap gap-4">
+          <span className="text-xs text-gray-500 font-bold">
+            Showing {filteredStudentsList.length} of {students.length} student records.
+          </span>
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleSaveAttendance}
+              disabled={saving || students.length === 0}
+              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              <span>{saving ? "⏳ Saving..." : "💾 Save & Finalize Exam Paper Attendance"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onProceedToMarks}
+              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
+            >
+              <span>➡️ Proceed to Marks Entry</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MarksEntryTable({
+  sharedFilters,
+  setSharedFilters,
+  onEditAttendance,
+}: {
+  sharedFilters: { session: string; programId: string; semester: string; courseId: string; progType: string };
+  setSharedFilters: React.Dispatch<React.SetStateAction<{ session: string; programId: string; semester: string; courseId: string; progType: string }>>;
+  onEditAttendance: () => void;
+}) {
+  const { data: session } = useSession();
+  const [entryType, setEntryType] = useState<"detailed" | "total">("detailed");
+
+  // Search & Filter states synced with sharedFilters
+  const [searchQuery, setSearchQuery] = useState("");
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<string[]>([
+    "2024-2028", "2025-2029", "2026-2030", "2023-2027", "2022-2026",
+    "2024-2026", "2025-2027", "2026-2028", "2023-2025", "2022-2024"
+  ]);
+  const [selectedProgType, setSelectedProgType] = useState(sharedFilters.progType || "ALL");
+  const [selectedSession, setSelectedSession] = useState(sharedFilters.session || "2024-2028");
+  const [selectedProgram, setSelectedProgram] = useState(sharedFilters.programId || "");
+  const [selectedSemester, setSelectedSemester] = useState(sharedFilters.semester || "1");
+  const [selectedCourse, setSelectedCourse] = useState(sharedFilters.courseId || "");
 
   const [courseTotalMarks, setCourseTotalMarks] = useState(100);
   const [students, setStudents] = useState<any[]>([]);
@@ -130,6 +683,17 @@ function MarksEntryTable() {
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Sync to parent sharedFilters
+  useEffect(() => {
+    setSharedFilters({
+      session: selectedSession,
+      programId: selectedProgram,
+      semester: selectedSemester,
+      courseId: selectedCourse,
+      progType: selectedProgType,
+    });
+  }, [selectedSession, selectedProgram, selectedSemester, selectedCourse, selectedProgType]);
 
   // Approval & Lock Lifecycle state
   const [resultStatus, setResultStatus] = useState<"SAVED" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "UNLOCK_REQUESTED" | "UNLOCKED_FOR_EDIT">("SAVED");
@@ -197,7 +761,7 @@ function MarksEntryTable() {
         setSelectedCourse(facultyAssignedCourse.id);
         const totals: Record<number, number> = { 1: 33, 2: 67, 3: 100, 4: 100 };
         setCourseTotalMarks(totals[facultyAssignedCourse.creditHours] ?? 100);
-      } else if (validProgs.length > 0) {
+      } else if (validProgs.length > 0 && !selectedProgram) {
         const firstProgId = validProgs[0].id;
         setSelectedProgram(firstProgId);
         const firstProgCourses = validCourses.filter((c: any) => c.programId === firstProgId);
@@ -239,7 +803,7 @@ function MarksEntryTable() {
   const [datesheetInfo, setDatesheetInfo] = useState<any>(null);
   const [examScheme, setExamScheme] = useState<"MID_FINAL" | "TERMINAL">("MID_FINAL");
 
-  // Fetch real students & existing marks when program & course are selected
+  // Fetch real students & existing marks when program & course & session are selected
   useEffect(() => {
     if (!selectedCourse) {
       setStudents([]);
@@ -253,6 +817,8 @@ function MarksEntryTable() {
     const queryParams = new URLSearchParams();
     queryParams.set("educationLevel", "BS");
     if (selectedProgram) queryParams.set("programId", selectedProgram);
+    if (selectedSession && selectedSession !== "ALL") queryParams.set("session", selectedSession);
+    if (selectedSemester) queryParams.set("currentSemester", selectedSemester);
 
     Promise.all([
       fetch(`/api/students?${queryParams}`).then(r => r.ok ? r.json() : []),
@@ -286,24 +852,67 @@ function MarksEntryTable() {
 
       const mapped = studentList.map((st: any) => {
         const existing = marksArr.find((m: any) => m.studentId === st.id);
+        const isAbsent = existing?.status === "ABSENT" || existing?.status === "A";
         return {
           id: st.id,
           name: st.user?.name || st.name || "Student",
           roll: st.rollNumber || st.roll || "N/A",
+          session: st.session || "",
+          currentSemester: st.currentSemester || 1,
           bsAdmissionType: st.bsAdmissionType || "REGULAR",
-          assignment: existing?.assignmentMarks || 0,
-          quiz: existing?.quizMarks || 0,
-          practical: existing?.practicalMarks || 0,
-          mid: existing?.midtermMarks || 0,
-          final: existing?.finalMarks || 0,
-          totalOnly: existing?.obtainedMarks || 0,
+          attendance: isAbsent ? "ABSENT" : "PRESENT",
+          assignment: isAbsent ? 0 : (existing?.assignmentMarks || 0),
+          quiz: isAbsent ? 0 : (existing?.quizMarks || 0),
+          practical: isAbsent ? 0 : (existing?.practicalMarks || 0),
+          mid: isAbsent ? 0 : (existing?.midtermMarks || 0),
+          final: isAbsent ? 0 : (existing?.finalMarks || 0),
+          totalOnly: isAbsent ? 0 : (existing?.obtainedMarks || 0),
         };
       });
 
       setStudents(mapped);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [selectedCourse, selectedProgram]);
+  }, [selectedCourse, selectedProgram, selectedSession, selectedSemester]);
+
+  const toggleStudentAttendance = (id: string, newStatus: "PRESENT" | "ABSENT") => {
+    if (isFacultyLocked) return;
+    setStudents(students.map(s => {
+      if (s.id !== id) return s;
+      if (newStatus === "ABSENT") {
+        return {
+          ...s,
+          attendance: "ABSENT",
+          assignment: 0,
+          quiz: 0,
+          practical: 0,
+          mid: 0,
+          final: 0,
+          totalOnly: 0
+        };
+      }
+      return { ...s, attendance: "PRESENT" };
+    }));
+  };
+
+  const markAllAttendance = (status: "PRESENT" | "ABSENT") => {
+    if (isFacultyLocked) return;
+    setStudents(students.map(s => {
+      if (status === "ABSENT") {
+        return {
+          ...s,
+          attendance: "ABSENT",
+          assignment: 0,
+          quiz: 0,
+          practical: 0,
+          mid: 0,
+          final: 0,
+          totalOnly: 0
+        };
+      }
+      return { ...s, attendance: "PRESENT" };
+    }));
+  };
 
   const currentSelectedCourse = courses.find((c: any) => c.id === selectedCourse);
   const isPracticalCourse = Boolean(
@@ -320,7 +929,7 @@ function MarksEntryTable() {
     if (isFacultyLocked) return;
     const numValue = parseFloat(value) || 0;
     const student = students.find(s => s.id === id);
-    if (!student) return;
+    if (!student || student.attendance === "ABSENT") return;
 
     const totalQuizAssignLimit = examScheme === "TERMINAL"
       ? (isPracticalCourse ? 5 : 30)
@@ -416,6 +1025,8 @@ function MarksEntryTable() {
     let successCount = 0;
     let lastError = "";
     for (const s of students) {
+      const isStudentAbsent = s.attendance === "ABSENT";
+      const studentStatus = isStudentAbsent ? "ABSENT" : targetStatus;
       try {
         const res = await fetch("/api/marks", {
           method: "POST",
@@ -423,13 +1034,13 @@ function MarksEntryTable() {
           body: JSON.stringify({
             studentId: s.id,
             courseId: selectedCourse,
-            assignmentMarks: s.assignment,
-            quizMarks: s.quiz,
-            practicalMarks: isPracticalCourse ? s.practical : 0,
-            midtermMarks: s.mid,
-            finalMarks: s.final,
+            assignmentMarks: isStudentAbsent ? 0 : s.assignment,
+            quizMarks: isStudentAbsent ? 0 : s.quiz,
+            practicalMarks: isStudentAbsent ? 0 : (isPracticalCourse ? s.practical : 0),
+            midtermMarks: isStudentAbsent ? 0 : s.mid,
+            finalMarks: isStudentAbsent ? 0 : s.final,
             totalMarks: courseTotalMarks,
-            status: targetStatus,
+            status: studentStatus,
             isLocked: lockVal,
           })
         });
@@ -527,6 +1138,11 @@ function MarksEntryTable() {
       const matchName = st.name.toLowerCase().includes(q);
       const matchRoll = st.roll.toLowerCase().includes(q);
       if (!matchName && !matchRoll) return false;
+    }
+
+    // Session filter
+    if (selectedSession && selectedSession !== "ALL" && st.session && st.session !== selectedSession) {
+      return false;
     }
 
     // Program type filter
@@ -787,6 +1403,33 @@ function MarksEntryTable() {
             )}
           </div>
 
+          {/* Exam Paper Attendance Summary Bar */}
+          <div className="p-4 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 rounded-2xl flex items-center justify-between flex-wrap gap-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">📋</span>
+              <div>
+                <h4 className="text-xs font-black uppercase text-blue-950 tracking-wider flex items-center gap-2">
+                  <span>Exam Paper Attendance Status</span>
+                </h4>
+                <p className="text-xs text-blue-800 font-semibold mt-0.5">
+                  Students marked as <strong>Absent (A)</strong> in Step 1 are automatically locked from mark entry and marked with <strong>'A'</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs font-bold">
+              <span className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-gray-700 shadow-sm">
+                Total: <strong>{students.length}</strong>
+              </span>
+              <span className="px-3 py-1.5 bg-green-100 border border-green-300 rounded-xl text-green-800 shadow-sm font-extrabold">
+                Present: <strong>{students.filter(s => s.attendance !== "ABSENT").length}</strong>
+              </span>
+              <span className="px-3 py-1.5 bg-red-100 border border-red-300 rounded-xl text-red-800 shadow-sm font-black">
+                Absent (A): <strong>{students.filter(s => s.attendance === "ABSENT").length}</strong>
+              </span>
+            </div>
+          </div>
+
           <div className="overflow-x-auto border rounded-xl shadow-sm">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -822,7 +1465,7 @@ function MarksEntryTable() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredStudentsList.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={11} className="px-6 py-12 text-center text-gray-500">
                       <div className="text-3xl mb-2">🚫</div>
                       <p className="font-semibold text-gray-700">No students found matching search & filter criteria.</p>
                       <p className="text-xs text-gray-400 mt-1">Try clearing search query or changing filters.</p>
@@ -830,21 +1473,29 @@ function MarksEntryTable() {
                   </tr>
                 ) : (
                   filteredStudentsList.map(s => {
+                    const isAbsent = s.attendance === "ABSENT";
                     const totalQuizAssignLimit = examScheme === "TERMINAL"
                       ? (isPracticalCourse ? 5 : 30)
                       : (isPracticalCourse ? 15 : 30);
                     const quizHasFullMarks = (s.quiz || 0) >= totalQuizAssignLimit;
                     const assignHasFullMarks = (s.assignment || 0) >= totalQuizAssignLimit;
 
-                    const obtained = getComputed(s);
-                    const gp = getGP(obtained, courseTotalMarks);
-                    const grade = getGrade(obtained, courseTotalMarks);
-                    const pass = gp >= 1.0;
+                    const obtained = isAbsent ? 0 : getComputed(s);
+                    const gp = isAbsent ? 0.0 : getGP(obtained, courseTotalMarks);
+                    const grade = isAbsent ? "F (A)" : getGrade(obtained, courseTotalMarks);
+                    const pass = !isAbsent && gp >= 1.0;
 
                     return (
-                      <tr key={s.id} className="hover:bg-gray-50">
+                      <tr key={s.id} className={`transition-colors ${isAbsent ? "bg-red-50/20" : "hover:bg-gray-50"}`}>
                         <td className="px-4 py-3">
-                          <div className="text-sm font-medium text-gray-900">{s.name}</div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-gray-900">{s.name}</span>
+                            {isAbsent && (
+                              <span className="px-2 py-0.5 text-[10px] font-black rounded-full bg-red-100 text-red-700 border border-red-200">
+                                ❌ ABSENT (A)
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-gray-500">{s.roll}</div>
                         </td>
 
@@ -856,11 +1507,16 @@ function MarksEntryTable() {
                                 min="0"
                                 max={totalQuizAssignLimit}
                                 step="0.5"
-                                disabled={isFacultyLocked || quizHasFullMarks}
-                                title={quizHasFullMarks ? `Quiz has taken full ${totalQuizAssignLimit} marks. Assignment auto-blocked!` : `Max allowed: ${Math.max(0, totalQuizAssignLimit - (s.quiz || 0))}`}
-                                className={`w-20 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-400 ${quizHasFullMarks ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" : ""
-                                  }`}
-                                value={quizHasFullMarks ? 0 : (s.assignment || "")}
+                                disabled={isFacultyLocked || quizHasFullMarks || isAbsent}
+                                title={isAbsent ? "Student is Absent. Cells locked!" : (quizHasFullMarks ? `Quiz has taken full ${totalQuizAssignLimit} marks. Assignment auto-blocked!` : `Max allowed: ${Math.max(0, totalQuizAssignLimit - (s.quiz || 0))}`)}
+                                className={`w-20 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-400 ${
+                                  isAbsent
+                                    ? "bg-red-50 text-red-400 border-red-200 cursor-not-allowed"
+                                    : quizHasFullMarks
+                                    ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300"
+                                    : ""
+                                }`}
+                                value={isAbsent ? 0 : (quizHasFullMarks ? 0 : (s.assignment || ""))}
                                 onChange={e => handleMarkChange(s.id, "assignment", e.target.value)}
                               />
                             </td>
@@ -870,17 +1526,36 @@ function MarksEntryTable() {
                                 min="0"
                                 max={totalQuizAssignLimit}
                                 step="0.5"
-                                disabled={isFacultyLocked || assignHasFullMarks}
-                                title={assignHasFullMarks ? `Assignment has taken full ${totalQuizAssignLimit} marks. Quiz auto-blocked!` : `Max allowed: ${Math.max(0, totalQuizAssignLimit - (s.assignment || 0))}`}
-                                className={`w-20 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-400 ${assignHasFullMarks ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" : ""
-                                  }`}
-                                value={assignHasFullMarks ? 0 : (s.quiz || "")}
+                                disabled={isFacultyLocked || assignHasFullMarks || isAbsent}
+                                title={isAbsent ? "Student is Absent. Cells locked!" : (assignHasFullMarks ? `Assignment has taken full ${totalQuizAssignLimit} marks. Quiz auto-blocked!` : `Max allowed: ${Math.max(0, totalQuizAssignLimit - (s.assignment || 0))}`)}
+                                className={`w-20 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-400 ${
+                                  isAbsent
+                                    ? "bg-red-50 text-red-400 border-red-200 cursor-not-allowed"
+                                    : assignHasFullMarks
+                                    ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300"
+                                    : ""
+                                }`}
+                                value={isAbsent ? 0 : (assignHasFullMarks ? 0 : (s.quiz || ""))}
                                 onChange={e => handleMarkChange(s.id, "quiz", e.target.value)}
                               />
                             </td>
                             {isPracticalCourse && (
                               <td className="px-4 py-3 bg-blue-50/70 border-x border-blue-200">
-                                <input type="number" min="0" max="25" step="0.5" disabled={isFacultyLocked} className="w-20 px-2 py-1 border border-blue-400 rounded text-sm font-black text-blue-900 bg-white focus:ring-2 focus:ring-blue-500 shadow-sm text-center" value={s.practical || ""} onChange={e => handleMarkChange(s.id, "practical", e.target.value)} />
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="25"
+                                  step="0.5"
+                                  disabled={isFacultyLocked || isAbsent}
+                                  title={isAbsent ? "Student is Absent. Cells locked!" : ""}
+                                  className={`w-20 px-2 py-1 border rounded text-sm font-black text-center ${
+                                    isAbsent
+                                      ? "bg-red-50 border-red-200 text-red-400 cursor-not-allowed"
+                                      : "border-blue-400 text-blue-900 bg-white focus:ring-2 focus:ring-blue-500 shadow-sm"
+                                  }`}
+                                  value={isAbsent ? 0 : (s.practical || "")}
+                                  onChange={e => handleMarkChange(s.id, "practical", e.target.value)}
+                                />
                               </td>
                             )}
                             <td className="px-4 py-3">
@@ -889,10 +1564,16 @@ function MarksEntryTable() {
                                 min="0"
                                 max="30"
                                 step="0.5"
-                                disabled={isFacultyLocked || examScheme === "TERMINAL"}
-                                className={`w-20 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-400 ${examScheme === "TERMINAL" ? "bg-gray-100 text-gray-400 cursor-not-allowed font-bold" : ""
-                                  }`}
-                                value={examScheme === "TERMINAL" ? 0 : (s.mid || "")}
+                                disabled={isFacultyLocked || examScheme === "TERMINAL" || isAbsent}
+                                title={isAbsent ? "Student is Absent. Cells locked!" : ""}
+                                className={`w-20 px-2 py-1 border rounded text-sm text-center focus:ring-2 focus:ring-blue-400 ${
+                                  isAbsent
+                                    ? "bg-red-50 text-red-400 border-red-200 cursor-not-allowed"
+                                    : examScheme === "TERMINAL"
+                                    ? "bg-gray-100 text-gray-400 cursor-not-allowed font-bold"
+                                    : ""
+                                }`}
+                                value={isAbsent || examScheme === "TERMINAL" ? 0 : (s.mid || "")}
                                 onChange={e => handleMarkChange(s.id, "mid", e.target.value)}
                               />
                             </td>
@@ -902,45 +1583,73 @@ function MarksEntryTable() {
                                 min="0"
                                 max={examScheme === "TERMINAL" ? 70 : 40}
                                 step="0.5"
-                                disabled={isFacultyLocked}
-                                className={`w-20 px-2 py-1 border rounded text-sm focus:ring-2 text-center disabled:bg-gray-100 disabled:cursor-not-allowed ${examScheme === "TERMINAL" ? "border-purple-400 font-black text-purple-950 focus:ring-purple-500 shadow-sm bg-white" : "focus:ring-blue-400"
-                                  }`}
-                                value={s.final || ""}
+                                disabled={isFacultyLocked || isAbsent}
+                                title={isAbsent ? "Student is Absent. Cells locked!" : ""}
+                                className={`w-20 px-2 py-1 border rounded text-sm focus:ring-2 text-center disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                                  isAbsent
+                                    ? "bg-red-50 text-red-400 border-red-200 cursor-not-allowed"
+                                    : examScheme === "TERMINAL"
+                                    ? "border-purple-400 font-black text-purple-950 focus:ring-purple-500 shadow-sm bg-white"
+                                    : "focus:ring-blue-400"
+                                }`}
+                                value={isAbsent ? 0 : (s.final || "")}
                                 onChange={e => handleMarkChange(s.id, "final", e.target.value)}
                               />
                             </td>
-                            <td className="px-4 py-3 font-bold text-blue-700 bg-blue-50 text-center">
-                              {obtained}
+                            <td className="px-4 py-3 font-bold text-center">
+                              {isAbsent ? (
+                                <span className="px-2.5 py-1 bg-red-100 text-red-700 font-black rounded-lg text-xs border border-red-200 shadow-sm">
+                                  A (ABSENT)
+                                </span>
+                              ) : (
+                                <span className="text-blue-700 bg-blue-50 px-3 py-1 rounded-md">{obtained}</span>
+                              )}
                             </td>
                           </>
                         ) : (
                           <td className="px-4 py-3">
-                            <input
-                              type="number" min="0" max={courseTotalMarks} step="0.5"
-                              disabled={isFacultyLocked}
-                              className="w-24 px-3 py-1.5 border-2 border-blue-200 rounded focus:border-blue-500 font-bold text-blue-700 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                              value={s.totalOnly || ""}
-                              onChange={e => handleMarkChange(s.id, "totalOnly", e.target.value)}
-                            />
+                            {isAbsent ? (
+                              <span className="px-2.5 py-1 bg-red-100 text-red-700 font-black rounded-lg text-xs border border-red-200 shadow-sm">
+                                A (ABSENT)
+                              </span>
+                            ) : (
+                              <input
+                                type="number" min="0" max={courseTotalMarks} step="0.5"
+                                disabled={isFacultyLocked || isAbsent}
+                                className="w-24 px-3 py-1.5 border-2 border-blue-200 rounded focus:border-blue-500 font-bold text-blue-700 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                value={s.totalOnly || ""}
+                                onChange={e => handleMarkChange(s.id, "totalOnly", e.target.value)}
+                              />
+                            )}
                           </td>
                         )}
 
-                        <td className="px-4 py-3 text-center bg-indigo-50 font-bold text-indigo-700">
-                          {obtained === 0 ? "—" : grade}
+                        <td className={`px-4 py-3 text-center font-bold ${isAbsent ? "text-red-600 bg-red-50" : "bg-indigo-50 text-indigo-700"}`}>
+                          {isAbsent ? "F (A)" : obtained === 0 ? "—" : grade}
                         </td>
 
-                        <td className="px-4 py-3 text-center bg-purple-50">
-                          <span className={`text-sm font-bold ${gp >= 3.5 ? "text-green-600" :
-                            gp >= 2.0 ? "text-blue-600" :
-                              gp >= 1.0 ? "text-yellow-600" :
-                                "text-red-500"
-                            }`}>
-                            {obtained === 0 ? "—" : gp.toFixed(2)}
+                        <td className={`px-4 py-3 text-center ${isAbsent ? "bg-red-50" : "bg-purple-50"}`}>
+                          <span className={`text-sm font-bold ${
+                            isAbsent
+                              ? "text-red-600"
+                              : gp >= 3.5
+                              ? "text-green-600"
+                              : gp >= 2.0
+                              ? "text-blue-600"
+                              : gp >= 1.0
+                              ? "text-yellow-600"
+                              : "text-red-500"
+                          }`}>
+                            {isAbsent ? "0.00" : obtained === 0 ? "—" : gp.toFixed(2)}
                           </span>
                         </td>
 
                         <td className="px-4 py-3 text-center">
-                          {obtained === 0 ? (
+                          {isAbsent ? (
+                            <span className="px-2.5 py-1 text-xs rounded-full font-black bg-red-100 text-red-800 border border-red-200">
+                              ❌ ABSENT (A)
+                            </span>
+                          ) : obtained === 0 ? (
                             <span className="px-3 py-1 text-xs rounded-full font-semibold bg-gray-100 text-gray-500">—</span>
                           ) : pass ? (
                             <span className="px-3 py-1 text-xs rounded-full font-bold bg-green-100 text-green-700 border border-green-200">

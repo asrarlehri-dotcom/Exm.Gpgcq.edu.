@@ -201,12 +201,13 @@ function buildStudentResults(
   (s.marks || []).forEach((m) => {
     const sem = m.course?.semester ?? m.semester ?? 1;
     const credit = m.course?.creditHours || 3;
-    const gp = getGPValue(m.obtainedMarks, m.totalMarks);
+    const isAbsent = (m as any).status === "ABSENT" || (m as any).status === "A";
+    const gp = isAbsent ? 0.0 : getGPValue(m.obtainedMarks, m.totalMarks);
 
-    if (gp === 0 && sem === selectedSemester) {
+    if ((gp === 0 || isAbsent) && sem === selectedSemester) {
       failedCourses.push({
         id: m.course?.id,
-        title: m.course?.title || "Subject",
+        title: isAbsent ? `${m.course?.title || "Subject"} (A)` : (m.course?.title || "Subject"),
         code: m.course?.code,
         programId: m.course?.programId || s.programId || undefined,
       });
@@ -228,27 +229,40 @@ function buildStudentResults(
   const gpa = targetSem ? targetSem.gpa : 0;
 
   // Per-course marks + totals for selected semester (supports both ID and Title lookup)
-  const courseMarksById: Record<string, number> = {};
-  const courseMarksByTitle: Record<string, number> = {};
+  const courseMarksById: Record<string, number | "A"> = {};
+  const courseMarksByTitle: Record<string, number | "A"> = {};
   let totalObtained = 0;
   let totalMax = 0;
+  let totalAbsentCount = 0;
+  let semPaperCount = 0;
 
   (s.marks || [])
     .filter((m) => (m.course?.semester ?? m.semester ?? 1) === selectedSemester)
     .forEach((m) => {
-      if (m.courseId) courseMarksById[m.courseId] = m.obtainedMarks;
-      if (m.course?.id) courseMarksById[m.course.id] = m.obtainedMarks;
-      if (m.course?.title) {
-        courseMarksByTitle[m.course.title.trim().toLowerCase()] = m.obtainedMarks;
+      semPaperCount++;
+      const isAbsent = (m as any).status === "ABSENT" || (m as any).status === "A";
+      if (isAbsent) {
+        totalAbsentCount++;
+        if (m.courseId) courseMarksById[m.courseId] = "A";
+        if (m.course?.id) courseMarksById[m.course.id] = "A";
+        if (m.course?.title) courseMarksByTitle[m.course.title.trim().toLowerCase()] = "A";
+      } else {
+        if (m.courseId) courseMarksById[m.courseId] = m.obtainedMarks;
+        if (m.course?.id) courseMarksById[m.course.id] = m.obtainedMarks;
+        if (m.course?.title) {
+          courseMarksByTitle[m.course.title.trim().toLowerCase()] = m.obtainedMarks;
+        }
+        totalObtained += m.obtainedMarks;
       }
-      totalObtained += m.obtainedMarks;
       totalMax += m.totalMarks;
     });
 
   const pct = totalMax > 0 ? (totalObtained / totalMax) * 100 : 0;
   let grade = "—";
   if (totalMax > 0) {
-    if (gpa < 1.00) {
+    if (totalAbsentCount > 0 && totalAbsentCount === semPaperCount) {
+      grade = "F (A)";
+    } else if (gpa < 1.00) {
       grade = "F";
     } else {
       grade = getGrade(gpa, pct);
@@ -256,13 +270,11 @@ function buildStudentResults(
   }
 
   // Per-semester promotion logic based on university rules:
-  // Semester 1: 1.00 GPA
-  // Semester 2: 1.50 CGPA
-  // Semester 3: 1.75 CGPA
-  // Semester 4-8: 2.00 CGPA
   let status = "PROMOTED";
   if (totalMax === 0) {
     status = "—";
+  } else if (totalAbsentCount > 0 && totalAbsentCount === semPaperCount) {
+    status = "ABSENT";
   } else if (selectedSemester === 1) {
     if (gpa >= 1.00) status = "PROMOTED";
     else status = "DROPOUT";
@@ -295,17 +307,22 @@ function buildStudentResults(
       return sem >= 1 && sem <= selectedSemester;
     })
     .forEach((m) => {
-      cumObtained += m.obtainedMarks;
+      const isAbsent = (m as any).status === "ABSENT" || (m as any).status === "A";
+      if (!isAbsent) cumObtained += m.obtainedMarks;
       cumMax += m.totalMarks;
       cumCredits += m.course?.creditHours || 3;
     });
 
   // Serialized / numbered failed papers: "1. Math, 2. Physics"
-  const serializedFailed = failedCourses.map((c, i) => `${i + 1}. ${c.title}`).join(", ");
-  const remarks =
-    failedCourses.length === 0
-      ? "Clear"
-      : `Failed in ${failedCourses.length} Paper(s): ${serializedFailed}`;
+  let remarks = "Passed";
+  if (totalMax === 0) {
+    remarks = "—";
+  } else if (totalAbsentCount > 0 && totalAbsentCount === semPaperCount) {
+    remarks = "Absent in all Exam Papers (A)";
+  } else if (failedCourses.length > 0) {
+    const serializedFailed = failedCourses.map((c, i) => `${i + 1}. ${c.title}`).join(", ");
+    remarks = `Failed in ${failedCourses.length} Paper(s): ${serializedFailed}`;
+  }
 
   return {
     gpa,
@@ -315,6 +332,8 @@ function buildStudentResults(
     pct,
     totalObtained,
     totalMax,
+    totalAbsentCount,
+    semPaperCount,
     courseMarksById,
     courseMarksByTitle,
     failedCourses,
@@ -350,6 +369,26 @@ export default function GazetteCompilerPage() {
   const [selectedProgram, setSelectedProgram] = useState<string>("ALL");
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [expandedRemarks, setExpandedRemarks] = useState<Record<string, boolean>>({});
+  const [allExpanded, setAllExpanded] = useState(false);
+
+  const toggleStudentExpand = (id: string) => {
+    setExpandedRemarks((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const toggleAllRemarks = () => {
+    const nextState = !allExpanded;
+    setAllExpanded(nextState);
+    if (nextState) {
+      const map: Record<string, boolean> = {};
+      allStudents.forEach((s) => {
+        map[s.id] = true;
+      });
+      setExpandedRemarks(map);
+    } else {
+      setExpandedRemarks({});
+    }
+  };
 
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -485,19 +524,28 @@ export default function GazetteCompilerPage() {
       `}</style>
 
       {/* Page Header (Web only) */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between print:hidden">
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between flex-wrap gap-4 print:hidden">
         <div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Official Results Gazette</h1>
           <p className="text-slate-500 mt-1 font-medium text-sm">
             Program-wise structured results gazette compiled for semesters and batches.
           </p>
         </div>
-        <button
-          onClick={() => window.print()}
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2"
-        >
-          🖨️ Print Gazette
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleAllRemarks}
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold border border-slate-300 transition-all flex items-center gap-2 shadow-xs"
+            title="Expand or Collapse failed papers in all student rows"
+          >
+            <span>{allExpanded ? "🔼 Collapse All Papers" : "🔽 Expand All Papers"}</span>
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2"
+          >
+            🖨️ Print Gazette
+          </button>
+        </div>
       </div>
 
       {/* Filters (Web only) */}
@@ -695,6 +743,8 @@ export default function GazetteCompilerPage() {
                           pct,
                           totalObtained,
                           totalMax,
+                          totalAbsentCount,
+                          semPaperCount,
                           courseMarksById,
                           courseMarksByTitle,
                           failedCourses,
@@ -727,27 +777,44 @@ export default function GazetteCompilerPage() {
                               const obtained = (course.id && courseMarksById[course.id] !== undefined)
                                 ? courseMarksById[course.id]
                                 : courseMarksByTitle[course.title.trim().toLowerCase()];
+                              const isAbsentPaper = obtained === "A";
                               const maxMark = courseMaxMarks[course.title] || 0;
-                              const paperPct = maxMark > 0 && obtained !== undefined ? (obtained / maxMark) * 100 : -1;
-                              const isFail = paperPct >= 0 && paperPct < 50;
+                              const paperPct = !isAbsentPaper && maxMark > 0 && typeof obtained === "number" ? (obtained / maxMark) * 100 : -1;
+                              const isFail = isAbsentPaper || (paperPct >= 0 && paperPct < 50);
                               return (
                                 <td
                                   key={`${s.id}-${course.title}`}
                                   className={`px-3 py-2.5 text-center font-bold text-xs border-l border-slate-100 print:border-slate-300 ${
-                                    isFail
+                                    isAbsentPaper
+                                      ? "text-rose-700 bg-rose-50/70 font-black print:text-rose-900"
+                                      : isFail
                                       ? "text-rose-600 bg-rose-50/40 print:bg-transparent"
                                       : obtained !== undefined
                                       ? "text-slate-800"
                                       : "text-slate-300"
                                   }`}
                                 >
-                                  {obtained !== undefined ? obtained : "—"}
+                                  {isAbsentPaper ? (
+                                    <span className="px-1.5 py-0.5 bg-rose-100 border border-rose-300 text-rose-700 rounded font-black text-[11px]">
+                                      A
+                                    </span>
+                                  ) : obtained !== undefined ? (
+                                    obtained
+                                  ) : (
+                                    "—"
+                                  )}
                                 </td>
                               );
                             })}
 
                             <td className="px-3 py-2.5 text-center font-bold text-slate-800 border-l border-slate-100 print:border-slate-300 text-xs whitespace-nowrap">
-                              {totalMax > 0 ? totalObtained : "—"}
+                              {totalMax === 0 ? "—" : totalAbsentCount > 0 && totalAbsentCount === semPaperCount ? (
+                                <span className="px-2 py-0.5 bg-rose-100 text-rose-700 border border-rose-300 rounded font-black text-xs">
+                                  A
+                                </span>
+                              ) : (
+                                totalObtained
+                              )}
                             </td>
                             <td className="px-3 py-2.5 text-center font-bold text-slate-700 border-l border-slate-100 print:border-slate-300 text-xs">
                               {totalMax > 0 ? pct.toFixed(1) : "—"}
@@ -786,36 +853,88 @@ export default function GazetteCompilerPage() {
                                 {status}
                               </span>
                             </td>
-                            <td className={`px-3 py-2.5 text-xs font-semibold border-l border-slate-100 print:border-slate-300 ${isAllPass ? "text-emerald-600" : "text-rose-600"}`}>
+                            <td className="px-3 py-2 text-xs font-semibold border-l border-slate-100 print:border-slate-300 align-middle">
                               {isAllPass ? (
-                                <span className="font-bold text-emerald-600">Clear</span>
+                                <span className="inline-flex items-center gap-1 font-bold text-emerald-600 text-xs">
+                                  <span className="text-emerald-500 font-bold">✓</span> Passed
+                                </span>
                               ) : (
-                                <div className="leading-tight">
-                                  <div className="font-bold text-[11px] mb-1 text-rose-700">Failed in {failedCourses.length} Paper(s):</div>
-                                  <div className="space-y-1 text-[10px]">
-                                    {failedCourses.map((c, i) => {
-                                      const targetUrl = c.id
-                                        ? `/bs/marks?courseId=${c.id}&programId=${c.programId || s.programId || ""}&semester=${selectedSemester}&session=${s.session || ""}`
-                                        : `/bs/marks?courseTitle=${encodeURIComponent(c.title)}&programId=${s.programId || ""}&semester=${selectedSemester}&session=${s.session || ""}`;
+                                (() => {
+                                  const isDropout = status === "DROPOUT";
+                                  const isAbsent = status === "ABSENT";
+                                  const isRed = isDropout || isAbsent;
 
-                                      return (
-                                        <div key={i} className="flex items-center gap-1">
-                                          <span className="font-bold text-rose-800">{i + 1}.</span>
-                                          <a
-                                            href={targetUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            title={`Click to enter/edit marks for ${c.title}`}
-                                            className="text-rose-600 hover:text-blue-700 hover:underline font-semibold transition-colors inline-flex items-center gap-0.5 group print:no-underline print:text-slate-800"
-                                          >
-                                            <span>{c.title}</span>
-                                            <span className="text-[9px] opacity-60 group-hover:opacity-100 font-mono print:hidden">↗</span>
-                                          </a>
+                                  // Promoted / Probation with failed papers in Orange (amber), Dropout / Absent in Red (rose)
+                                  const colorScheme = isRed
+                                    ? {
+                                        btnBg: "bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-300",
+                                        headerText: "text-rose-700",
+                                        numColor: "text-rose-800",
+                                        linkColor: "text-rose-700 hover:text-rose-900",
+                                        borderColor: "border-rose-200",
+                                        dotColor: "bg-rose-500",
+                                      }
+                                    : {
+                                        btnBg: "bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300",
+                                        headerText: "text-amber-800",
+                                        numColor: "text-amber-900",
+                                        linkColor: "text-amber-700 hover:text-amber-950",
+                                        borderColor: "border-amber-200",
+                                        dotColor: "bg-amber-500",
+                                      };
+
+                                  const isExpanded = Boolean(expandedRemarks[s.id]);
+
+                                  return (
+                                    <div className="min-w-[155px]">
+                                      {/* Uniform height collapse/expand button to keep all rows same height */}
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleStudentExpand(s.id)}
+                                        className={`px-2.5 py-1 text-[10px] font-extrabold rounded-lg border transition-all flex items-center justify-between w-full shadow-xs ${colorScheme.btnBg} print:hidden`}
+                                        title="Click to Expand / Collapse Failed Papers"
+                                      >
+                                        <span className="flex items-center gap-1.5 truncate">
+                                          <span className={`w-1.5 h-1.5 rounded-full ${colorScheme.dotColor}`}></span>
+                                          <span>Failed in {failedCourses.length} Paper{failedCourses.length > 1 ? "s" : ""}</span>
+                                        </span>
+                                        <span className="text-[9px] font-mono ml-1 shrink-0 opacity-80">
+                                          {isExpanded ? "▲" : "▼"}
+                                        </span>
+                                      </button>
+
+                                      {/* Expanded paper details (or print view) */}
+                                      <div className={`${isExpanded ? "block mt-1.5 pt-1.5 border-t " + colorScheme.borderColor : "hidden"} print:block print:border-none print:p-0`}>
+                                        <div className={`font-bold text-[9px] mb-1 ${colorScheme.headerText} hidden print:block`}>
+                                          Failed in {failedCourses.length} Paper(s):
                                         </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
+                                        <div className="space-y-1 text-[10px]">
+                                          {failedCourses.map((c, i) => {
+                                            const targetUrl = c.id
+                                              ? `/bs/marks?courseId=${c.id}&programId=${c.programId || s.programId || ""}&semester=${selectedSemester}&session=${s.session || ""}`
+                                              : `/bs/marks?courseTitle=${encodeURIComponent(c.title)}&programId=${s.programId || ""}&semester=${selectedSemester}&session=${s.session || ""}`;
+
+                                            return (
+                                              <div key={i} className="flex items-center gap-1">
+                                                <span className={`font-black ${colorScheme.numColor}`}>{i + 1}.</span>
+                                                <a
+                                                  href={targetUrl}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  title={`Click to enter/edit marks for ${c.title}`}
+                                                  className={`${colorScheme.linkColor} hover:underline font-semibold transition-colors inline-flex items-center gap-0.5 group print:no-underline print:text-slate-800`}
+                                                >
+                                                  <span>{c.title}</span>
+                                                  <span className="text-[9px] opacity-60 group-hover:opacity-100 font-mono print:hidden">↗</span>
+                                                </a>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })()
                               )}
                             </td>
                           </tr>

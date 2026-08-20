@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
     const educationLevel = searchParams.get("educationLevel") || undefined;
     const programId = searchParams.get("programId") || undefined;
     const sessionParam = searchParams.get("session") || undefined;
+    const currentSemesterParam = searchParams.get("currentSemester") || searchParams.get("semester") || undefined;
     const courseId = searchParams.get("courseId") || undefined; // New: filter by enrollment
 
     // ── Enrollment-based filtering ───────────────────────────────────────────
@@ -26,10 +27,21 @@ export async function GET(req: NextRequest) {
     // This is used by the marks entry page to show the correct student list.
     if (courseId) {
       const enrollments = await prisma.enrollment.findMany({
-        where: { courseId, status: "ACTIVE" },
+        where: {
+          courseId,
+          status: "ACTIVE",
+          ...(sessionParam && sessionParam !== "ALL" && {
+            student: {
+              OR: [
+                { session: sessionParam },
+                { session: { contains: sessionParam } },
+              ],
+            },
+          }),
+        },
         include: {
           student: {
-            include: { user: true, program: true, group: true, statuses: true },
+            include: { user: true, program: true, group: true, statuses: true, promotions: true },
           },
         },
         orderBy: { createdAt: "asc" },
@@ -49,12 +61,16 @@ export async function GET(req: NextRequest) {
             { session: { contains: sessionParam } },
           ],
         }),
+        ...(currentSemesterParam && {
+          currentSemester: parseInt(currentSemesterParam),
+        }),
       },
       include: {
         user: true,
         program: true,
         group: true,
         statuses: true,
+        promotions: true,
         marks: {
           include: {
             course: true,

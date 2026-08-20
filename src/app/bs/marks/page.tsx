@@ -255,9 +255,15 @@ export default function AddResultPage() {
     setLoading(true);
     setExamDateLock(null);
 
+    const queryParams = new URLSearchParams();
+    queryParams.set("courseId", selectedCourse);
+    if (selectedProgram) queryParams.set("programId", selectedProgram);
+    if (selectedSession && selectedSession !== "ALL") queryParams.set("session", selectedSession);
+    if (selectedSemester) queryParams.set("currentSemester", selectedSemester);
+
     Promise.all([
       // Fetch students enrolled in this specific course (via Enrollment table)
-      fetch(`/api/students?courseId=${selectedCourse}`, { cache: "no-store" }).then(r => r.ok ? r.json() : []),
+      fetch(`/api/students?${queryParams}`, { cache: "no-store" }).then(r => r.ok ? r.json() : []),
       fetch(`/api/marks?courseId=${selectedCourse}`, { cache: "no-store" }).then(r => r.json()),
       fetch(`/api/datesheet?courseId=${selectedCourse}`, { cache: "no-store" }).then(r => r.ok ? r.json() : [])
     ]).then(([sData, mData, dsData]) => {
@@ -297,24 +303,90 @@ export default function AddResultPage() {
 
       const mapped = studentList.map((st: any) => {
         const existing = marksArr.find((m: any) => m.studentId === st.id);
+        const isAbsent = existing?.status === "ABSENT" || existing?.status === "A";
+        const rawName = st.user?.name || st.name || "Student";
+
+        // Clean name so "(Dropout)" is never shown with the name
+        const cleanName = rawName.replace(/\s*\(\s*dropout\s*\)/gi, "").replace(/\s*dropout\s*/gi, "").trim();
+
+        // Dropout policy rule:
+        // Dropout status is ONLY calculated AFTER at least 1 full semester is completed (Semester >= 2).
+        // During 1st semester marks entry, students cannot have dropout status because SGPA is not yet finalized.
+        const isFirstSemester = selectedSemester === "1" || st.currentSemester === 1;
+
+        let isDropout = false;
+        if (!isFirstSemester) {
+          const hasDropoutStatus =
+            st.statuses?.some((s: any) => s.statusType?.toUpperCase() === "DROPOUT" && s.isActive !== false) ||
+            st.promotions?.some((p: any) => p.status?.toUpperCase() === "DROPOUT" && p.isActive !== false) ||
+            st.status === "DROPOUT" ||
+            existing?.status === "DROPOUT";
+          isDropout = Boolean(hasDropoutStatus);
+        }
+
         return {
           id: st.id,
-          name: st.user?.name || st.name || "Student",
+          name: cleanName,
+          fatherName: st.fatherName || st.user?.fatherName || "",
           roll: st.rollNumber || st.roll || "N/A",
+          session: st.session || "",
+          currentSemester: st.currentSemester || 1,
           bsAdmissionType: st.bsAdmissionType || "REGULAR",
-          assignment: existing?.assignmentMarks || 0,
-          quiz: existing?.quizMarks || 0,
-          practical: existing?.practicalMarks || 0,
-          mid: existing?.midtermMarks || 0,
-          final: existing?.finalMarks || 0,
-          totalOnly: existing?.obtainedMarks || 0,
+          isDropout,
+          attendance: isAbsent ? "ABSENT" : "PRESENT",
+          assignment: (isAbsent || isDropout) ? 0 : (existing?.assignmentMarks || 0),
+          quiz: (isAbsent || isDropout) ? 0 : (existing?.quizMarks || 0),
+          practical: (isAbsent || isDropout) ? 0 : (existing?.practicalMarks || 0),
+          mid: (isAbsent || isDropout) ? 0 : (existing?.midtermMarks || 0),
+          final: (isAbsent || isDropout) ? 0 : (existing?.finalMarks || 0),
+          totalOnly: (isAbsent || isDropout) ? 0 : (existing?.obtainedMarks || 0),
         };
       });
 
       setStudents(mapped);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [selectedCourse]);
+  }, [selectedCourse, selectedProgram, selectedSession, selectedSemester]);
+
+  const toggleStudentAttendance = (id: string, newStatus: "PRESENT" | "ABSENT") => {
+    if (isFacultyLocked) return;
+    setStudents(students.map(s => {
+      if (s.id !== id || s.isDropout) return s;
+      if (newStatus === "ABSENT") {
+        return {
+          ...s,
+          attendance: "ABSENT",
+          assignment: 0,
+          quiz: 0,
+          practical: 0,
+          mid: 0,
+          final: 0,
+          totalOnly: 0
+        };
+      }
+      return { ...s, attendance: "PRESENT" };
+    }));
+  };
+
+  const markAllAttendance = (status: "PRESENT" | "ABSENT") => {
+    if (isFacultyLocked) return;
+    setStudents(students.map(s => {
+      if (s.isDropout) return s;
+      if (status === "ABSENT") {
+        return {
+          ...s,
+          attendance: "ABSENT",
+          assignment: 0,
+          quiz: 0,
+          practical: 0,
+          mid: 0,
+          final: 0,
+          totalOnly: 0
+        };
+      }
+      return { ...s, attendance: "PRESENT" };
+    }));
+  };
 
   const currentSelectedCourse = courses.find(c => c.id === selectedCourse);
   const isPracticalCourse = Boolean(
@@ -331,7 +403,7 @@ export default function AddResultPage() {
     if (isFacultyLocked) return;
     const numValue = parseFloat(value) || 0;
     const student = students.find(s => s.id === id);
-    if (!student) return;
+    if (!student || student.attendance === "ABSENT" || student.isDropout) return;
 
     const totalQuizAssignLimit = examScheme === "TERMINAL"
       ? (isPracticalCourse ? 5 : 30)
@@ -410,6 +482,8 @@ export default function AddResultPage() {
 
   const handleTotalOnlyChange = (id: string, value: string) => {
     if (isFacultyLocked) return;
+    const student = students.find(s => s.id === id);
+    if (!student || student.attendance === "ABSENT" || student.isDropout) return;
     const numValue = parseFloat(value) || 0;
     if (numValue > courseTotalMarks) {
       alert(`Total marks cannot exceed ${courseTotalMarks}!`);
@@ -434,6 +508,9 @@ export default function AddResultPage() {
     let successCount = 0;
     let lastError = "";
     for (const s of students) {
+      const isStudentAbsent = s.attendance === "ABSENT";
+      const isStudentDropout = Boolean(s.isDropout);
+      const studentStatus = isStudentDropout ? "DROPOUT" : isStudentAbsent ? "ABSENT" : targetStatus;
       try {
         const res = await fetch("/api/marks", {
           method: "POST",
@@ -441,13 +518,13 @@ export default function AddResultPage() {
           body: JSON.stringify({
             studentId: s.id,
             courseId: selectedCourse,
-            assignmentMarks: s.assignment,
-            quizMarks: s.quiz,
-            practicalMarks: isPracticalCourse ? s.practical : 0,
-            midtermMarks: s.mid,
-            finalMarks: s.final,
+            assignmentMarks: (isStudentAbsent || isStudentDropout) ? 0 : s.assignment,
+            quizMarks: (isStudentAbsent || isStudentDropout) ? 0 : s.quiz,
+            practicalMarks: (isStudentAbsent || isStudentDropout) ? 0 : (isPracticalCourse ? s.practical : 0),
+            midtermMarks: (isStudentAbsent || isStudentDropout) ? 0 : s.mid,
+            finalMarks: (isStudentAbsent || isStudentDropout) ? 0 : s.final,
             totalMarks: courseTotalMarks,
-            status: targetStatus,
+            status: studentStatus,
             isLocked: lockVal,
           })
         });
@@ -558,6 +635,9 @@ export default function AddResultPage() {
       const matchName = st.name.toLowerCase().includes(q);
       const matchRoll = st.roll.toLowerCase().includes(q);
       if (!matchName && !matchRoll) return false;
+    }
+    if (selectedSession && selectedSession !== "ALL" && st.session && st.session !== selectedSession) {
+      return false;
     }
     if (selectedProgType === "ALL") return true;
     if (selectedProgType === "REGULAR") return st.bsAdmissionType === "REGULAR" || !st.bsAdmissionType;
@@ -965,6 +1045,33 @@ export default function AddResultPage() {
             </div>
           </div>
 
+          {/* Exam Paper Attendance Summary Bar */}
+          <div className="p-4 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 rounded-2xl flex items-center justify-between flex-wrap gap-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">📋</span>
+              <div>
+                <h4 className="text-xs font-black uppercase text-blue-950 tracking-wider flex items-center gap-2">
+                  <span>Exam Paper Attendance Status</span>
+                </h4>
+                <p className="text-xs text-blue-800 font-semibold mt-0.5">
+                  Students marked as <strong>Absent (A)</strong> are automatically locked from mark entry and marked with <strong>'A'</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs font-bold">
+              <span className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-gray-700 shadow-sm">
+                Total: <strong>{students.length}</strong>
+              </span>
+              <span className="px-3 py-1.5 bg-green-100 border border-green-300 rounded-xl text-green-800 shadow-sm font-extrabold">
+                Present: <strong>{students.filter(s => s.attendance !== "ABSENT").length}</strong>
+              </span>
+              <span className="px-3 py-1.5 bg-red-100 border border-red-300 rounded-xl text-red-800 shadow-sm font-black">
+                Absent (A): <strong>{students.filter(s => s.attendance === "ABSENT").length}</strong>
+              </span>
+            </div>
+          </div>
+
           {/* Marks Table */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-4 border-b bg-gray-50/50 flex items-center justify-between flex-wrap gap-4">
@@ -1006,7 +1113,9 @@ export default function AddResultPage() {
                 <table className="w-full text-left border-collapse text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b text-xs font-bold text-gray-600 uppercase">
-                      <th className="p-3">Student Name & Roll No</th>
+                      <th className="p-3 w-10 text-center">#</th>
+                      <th className="p-3">Roll No</th>
+                      <th className="p-3">Student & Father Name</th>
                       {entryType === "detailed" ? (
                         <>
                           <th className="p-3">Assign (Limit {examScheme === "TERMINAL" ? (isPracticalCourse ? '5' : '30') : (isPracticalCourse ? '15' : '30')})</th>
@@ -1035,27 +1144,52 @@ export default function AddResultPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredStudentsList.map((st) => {
+                    {filteredStudentsList.map((st, idx) => {
+                      const isAbsent = st.attendance === "ABSENT";
+                      const isDropout = Boolean(st.isDropout);
+                      const isBlocked = isAbsent || isDropout;
+
                       const totalQuizAssignLimit = examScheme === "TERMINAL"
                         ? (isPracticalCourse ? 5 : 30)
                         : (isPracticalCourse ? 15 : 30);
                       const quizHasFullMarks = (st.quiz || 0) >= totalQuizAssignLimit;
                       const assignHasFullMarks = (st.assignment || 0) >= totalQuizAssignLimit;
 
-                      const calculatedObtained = entryType === "detailed"
-                        ? (st.assignment + st.quiz + (isPracticalCourse ? (st.practical || 0) : 0) + (examScheme === "TERMINAL" ? 0 : st.mid) + st.final)
-                        : st.totalOnly;
-                      const gp = getGP(calculatedObtained, courseTotalMarks);
-                      const grade = getGrade(calculatedObtained, courseTotalMarks);
-                      const isPass = gp >= 1.0;
+                      const calculatedObtained = isBlocked
+                        ? 0
+                        : (entryType === "detailed"
+                          ? (st.assignment + st.quiz + (isPracticalCourse ? (st.practical || 0) : 0) + (examScheme === "TERMINAL" ? 0 : st.mid) + st.final)
+                          : st.totalOnly);
+                      const gp = isBlocked ? 0.0 : getGP(calculatedObtained, courseTotalMarks);
+                      const grade = isDropout ? "-" : isAbsent ? "F (A)" : getGrade(calculatedObtained, courseTotalMarks);
+                      const isPass = !isBlocked && gp >= 1.0;
 
                       return (
-                        <tr key={st.id} className="border-b hover:bg-gray-50/50">
+                        <tr key={st.id} className={`border-b transition-colors ${isDropout ? "bg-gray-50/80" : isAbsent ? "bg-red-50/20" : "hover:bg-gray-50/50"}`}>
+                          <td className="p-3 text-center text-xs font-bold text-gray-400">
+                            {idx + 1}
+                          </td>
+                          <td className="p-3 whitespace-nowrap">
+                            <span className="text-xs font-mono font-semibold text-gray-800 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-md">
+                              {st.roll}
+                            </span>
+                          </td>
                           <td className="p-3">
-                            <strong className="block text-gray-900 font-bold">{st.name}</strong>
-                            <span className="text-xs font-mono text-gray-500">{st.roll}</span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <strong className="text-gray-900 font-bold">{st.name}</strong>
+                              {isAbsent && !isDropout && (
+                                <span className="px-2 py-0.5 text-[10px] font-black rounded-full bg-red-100 text-red-700 border border-red-200">
+                                  ❌ ABSENT (A)
+                                </span>
+                              )}
+                            </div>
+                            {st.fatherName && (
+                              <p className="text-[11px] text-gray-500 font-medium leading-tight mt-0.5">
+                                S/D of: {st.fatherName}
+                              </p>
+                            )}
                             {st.bsAdmissionType === "BRIDGING_5TH" && (
-                              <span className="ml-2 px-2 py-0.5 text-[10px] bg-purple-100 text-purple-700 font-bold rounded-full">Bridging 5th</span>
+                              <span className="inline-block mt-0.5 px-2 py-0.5 text-[10px] bg-purple-100 text-purple-700 font-bold rounded-full">Bridging 5th</span>
                             )}
                           </td>
 
@@ -1066,11 +1200,18 @@ export default function AddResultPage() {
                                   type="number"
                                   min="0"
                                   max={totalQuizAssignLimit}
-                                  value={quizHasFullMarks ? 0 : (st.assignment || "")}
+                                  value={isBlocked ? (isDropout ? "" : 0) : (quizHasFullMarks ? 0 : (st.assignment || ""))}
                                   onChange={(e) => handleMarkChange(st.id, "assignment", e.target.value)}
-                                  disabled={isFacultyLocked || quizHasFullMarks}
-                                  title={quizHasFullMarks ? `Quiz has taken full ${totalQuizAssignLimit} marks. Assignment auto-blocked!` : `Max allowed: ${Math.max(0, totalQuizAssignLimit - (st.quiz || 0))}`}
-                                  className={`w-16 px-2.5 py-1 border rounded-lg text-xs font-bold text-center ${quizHasFullMarks ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" : "bg-white"
+                                  disabled={isFacultyLocked || quizHasFullMarks || isBlocked}
+                                  placeholder={isDropout ? "-" : undefined}
+                                  title={isDropout ? "Student is Dropout. Marks Entry Blocked!" : isAbsent ? "Student is Absent. Cells locked!" : (quizHasFullMarks ? `Quiz has taken full ${totalQuizAssignLimit} marks. Assignment auto-blocked!` : `Max allowed: ${Math.max(0, totalQuizAssignLimit - (st.quiz || 0))}`)}
+                                  className={`w-16 px-2.5 py-1 border rounded-lg text-xs font-bold text-center ${isDropout
+                                      ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                                      : isAbsent
+                                        ? "bg-red-50 text-red-400 border-red-200 cursor-not-allowed"
+                                        : quizHasFullMarks
+                                          ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300"
+                                          : "bg-white"
                                     }`}
                                 />
                               </td>
@@ -1079,11 +1220,18 @@ export default function AddResultPage() {
                                   type="number"
                                   min="0"
                                   max={totalQuizAssignLimit}
-                                  value={assignHasFullMarks ? 0 : (st.quiz || "")}
+                                  value={isBlocked ? (isDropout ? "" : 0) : (assignHasFullMarks ? 0 : (st.quiz || ""))}
                                   onChange={(e) => handleMarkChange(st.id, "quiz", e.target.value)}
-                                  disabled={isFacultyLocked || assignHasFullMarks}
-                                  title={assignHasFullMarks ? `Assignment has taken full ${totalQuizAssignLimit} marks. Quiz auto-blocked!` : `Max allowed: ${Math.max(0, totalQuizAssignLimit - (st.assignment || 0))}`}
-                                  className={`w-16 px-2.5 py-1 border rounded-lg text-xs font-bold text-center ${assignHasFullMarks ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" : "bg-white"
+                                  disabled={isFacultyLocked || assignHasFullMarks || isBlocked}
+                                  placeholder={isDropout ? "-" : undefined}
+                                  title={isDropout ? "Student is Dropout. Marks Entry Blocked!" : isAbsent ? "Student is Absent. Cells locked!" : (assignHasFullMarks ? `Assignment has taken full ${totalQuizAssignLimit} marks. Quiz auto-blocked!` : `Max allowed: ${Math.max(0, totalQuizAssignLimit - (st.assignment || 0))}`)}
+                                  className={`w-16 px-2.5 py-1 border rounded-lg text-xs font-bold text-center ${isDropout
+                                      ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                                      : isAbsent
+                                        ? "bg-red-50 text-red-400 border-red-200 cursor-not-allowed"
+                                        : assignHasFullMarks
+                                          ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300"
+                                          : "bg-white"
                                     }`}
                                 />
                               </td>
@@ -1091,51 +1239,100 @@ export default function AddResultPage() {
                                 <td className="p-3 bg-blue-50/70 border-x border-blue-200">
                                   <input
                                     type="number"
-                                    placeholder="0"
-                                    value={st.practical || ""}
+                                    placeholder={isDropout ? "-" : "0"}
+                                    value={isBlocked ? (isDropout ? "" : 0) : (st.practical || "")}
                                     onChange={(e) => handleMarkChange(st.id, "practical", e.target.value)}
-                                    disabled={isFacultyLocked}
-                                    className="w-16 px-2.5 py-1 border border-blue-400 rounded-lg text-xs font-black text-center bg-white text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-sm"
+                                    disabled={isFacultyLocked || isBlocked}
+                                    title={isDropout ? "Student is Dropout. Marks Entry Blocked!" : isAbsent ? "Student is Absent. Cells locked!" : ""}
+                                    className={`w-16 px-2.5 py-1 border rounded-lg text-xs font-black text-center ${isDropout
+                                        ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                                        : isAbsent
+                                          ? "bg-red-50 border-red-200 text-red-400 cursor-not-allowed"
+                                          : "border-blue-400 bg-white text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-sm"
+                                      }`}
                                   />
                                 </td>
                               )}
                               <td className="p-3">
                                 <input
                                   type="number"
-                                  value={examScheme === "TERMINAL" ? 0 : (st.mid || "")}
+                                  value={isBlocked || examScheme === "TERMINAL" ? (isDropout ? "" : 0) : (st.mid || "")}
                                   onChange={(e) => handleMarkChange(st.id, "mid", e.target.value)}
-                                  disabled={isFacultyLocked || examScheme === "TERMINAL"}
-                                  className={`w-16 px-2.5 py-1 border rounded-lg text-xs font-bold text-center ${examScheme === "TERMINAL" ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-white"}`}
+                                  disabled={isFacultyLocked || examScheme === "TERMINAL" || isBlocked}
+                                  placeholder={isDropout ? "-" : undefined}
+                                  title={isDropout ? "Student is Dropout. Marks Entry Blocked!" : isAbsent ? "Student is Absent. Cells locked!" : ""}
+                                  className={`w-16 px-2.5 py-1 border rounded-lg text-xs font-bold text-center ${isDropout
+                                      ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                                      : isAbsent
+                                        ? "bg-red-50 text-red-400 border-red-200 cursor-not-allowed"
+                                        : examScheme === "TERMINAL"
+                                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                          : "bg-white"
+                                    }`}
                                 />
                               </td>
                               <td className={`p-3 ${examScheme === "TERMINAL" ? "bg-purple-50/70 border-x border-purple-200" : ""}`}>
                                 <input
                                   type="number"
-                                  value={st.final || ""}
+                                  value={isBlocked ? (isDropout ? "" : 0) : (st.final || "")}
                                   onChange={(e) => handleMarkChange(st.id, "final", e.target.value)}
-                                  disabled={isFacultyLocked}
-                                  className={`w-16 px-2.5 py-1 border rounded-lg text-xs font-bold text-center bg-white ${examScheme === "TERMINAL" ? "border-purple-400 font-black text-purple-950 focus:ring-2 focus:ring-purple-500 shadow-sm" : ""}`}
+                                  disabled={isFacultyLocked || isBlocked}
+                                  placeholder={isDropout ? "-" : undefined}
+                                  title={isDropout ? "Student is Dropout. Marks Entry Blocked!" : isAbsent ? "Student is Absent. Cells locked!" : ""}
+                                  className={`w-16 px-2.5 py-1 border rounded-lg text-xs font-bold text-center ${isDropout
+                                      ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                                      : isAbsent
+                                        ? "bg-red-50 text-red-400 border-red-200 cursor-not-allowed"
+                                        : examScheme === "TERMINAL"
+                                          ? "bg-white border-purple-400 font-black text-purple-950 focus:ring-2 focus:ring-purple-500 shadow-sm"
+                                          : "bg-white"
+                                    }`}
                                 />
                               </td>
-                              <td className="p-3 font-black text-gray-900">{calculatedObtained} / {courseTotalMarks}</td>
+                              <td className="p-3 font-black">
+                                {isDropout ? (
+                                  <span className="text-gray-400 font-bold">-</span>
+                                ) : isAbsent ? (
+                                  <span className="px-2.5 py-1 bg-red-100 text-red-700 font-black rounded-lg text-xs border border-red-200 shadow-sm">
+                                    A (ABSENT)
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-900">{calculatedObtained} / {courseTotalMarks}</span>
+                                )}
+                              </td>
                             </>
                           ) : (
                             <td className="p-3">
-                              <input
-                                type="number"
-                                value={st.totalOnly || ""}
-                                onChange={(e) => handleTotalOnlyChange(st.id, e.target.value)}
-                                disabled={isFacultyLocked}
-                                className="w-24 px-2.5 py-1 border rounded-lg text-xs font-bold text-center bg-white"
-                              />
+                              {isDropout ? (
+                                <span className="text-gray-400 font-bold">-</span>
+                              ) : isAbsent ? (
+                                <span className="px-2.5 py-1 bg-red-100 text-red-700 font-black rounded-lg text-xs border border-red-200 shadow-sm">
+                                  A (ABSENT)
+                                </span>
+                              ) : (
+                                <input
+                                  type="number"
+                                  value={st.totalOnly || ""}
+                                  onChange={(e) => handleTotalOnlyChange(st.id, e.target.value)}
+                                  disabled={isFacultyLocked || isBlocked}
+                                  className="w-24 px-2.5 py-1 border rounded-lg text-xs font-bold text-center bg-white"
+                                />
+                              )}
                             </td>
                           )}
 
-                          <td className="p-3 font-extrabold text-blue-900">{grade}</td>
-                          <td className="p-3 font-mono font-bold text-indigo-900">{gp.toFixed(2)}</td>
+                          <td className={`p-3 font-extrabold ${isDropout ? "text-gray-400 font-bold" : isAbsent ? "text-red-600 font-black" : "text-blue-900"}`}>{grade}</td>
+                          <td className={`p-3 font-mono font-bold ${isDropout ? "text-gray-400 font-semibold" : isAbsent ? "text-red-600" : "text-indigo-900"}`}>{isDropout ? "-" : gp.toFixed(2)}</td>
                           <td className="p-3">
-                            <span className={`px-2.5 py-1 text-xs rounded-full font-extrabold ${isPass ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                              {isPass ? '✅ Pass' : '❌ Fail'}
+                            <span className={`px-2.5 py-1 text-xs rounded-full font-black ${isDropout
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-sm'
+                                : isAbsent
+                                  ? 'bg-red-100 text-red-800 border border-red-200'
+                                  : isPass
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
+                              }`}>
+                              {isDropout ? '🚫 Dropout' : isAbsent ? '❌ ABSENT (A)' : isPass ? '✅ Pass' : '❌ Fail'}
                             </span>
                           </td>
                         </tr>
