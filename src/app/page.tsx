@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -109,6 +109,22 @@ export default function Home() {
 
   // Top Bar Search Query
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Video Ref for bulletproof autoplay
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.defaultMuted = true;
+      videoRef.current.muted = true;
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // Autoplay was prevented, will play on user interaction
+        });
+      }
+    }
+  }, [loading]);
 
   // Hero Slider index
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -418,15 +434,19 @@ export default function Home() {
           {/* Background Video with Cinematic Overlay */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
             <video
+              ref={videoRef}
               autoPlay
               loop
               muted
               playsInline
+              preload="auto"
               className="w-full h-full object-cover object-center scale-105"
-              poster={heroSlides[currentSlide]?.image}
             >
-              <source src={settings.HOMEPAGE_HERO_BG_VIDEO || "/Homepage.mp4"} type="video/mp4" />
               <source src="/homepage.mp4" type="video/mp4" />
+              <source src="/Homepage.mp4" type="video/mp4" />
+              {settings.HOMEPAGE_HERO_BG_VIDEO && (
+                <source src={settings.HOMEPAGE_HERO_BG_VIDEO} type="video/mp4" />
+              )}
             </video>
             {/* Cinematic Gradient & Vignette Overlay */}
             <div className="absolute inset-0 bg-gradient-to-b from-[#071325]/90 via-[#0a1e3f]/75 to-[#071325]/95" />
