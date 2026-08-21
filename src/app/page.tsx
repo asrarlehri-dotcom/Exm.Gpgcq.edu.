@@ -415,13 +415,22 @@ export default function Home() {
       ───────────────────────────────────────────── */}
       {showHero && (
         <section className="relative bg-[#071325] text-white min-h-[580px] md:min-h-[640px] flex flex-col justify-between overflow-hidden">
-          {/* Slider Background Image */}
-          <div
-            className="absolute inset-0 bg-cover bg-center transition-all duration-1000 transform scale-105"
-            style={{
-              backgroundImage: `linear-gradient(to bottom, rgba(7, 19, 37, 0.88) 0%, rgba(10, 30, 63, 0.75) 50%, rgba(7, 19, 37, 0.94) 100%), url(${heroSlides[currentSlide].image})`,
-            }}
-          />
+          {/* Background Video with Cinematic Overlay */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover object-center scale-105"
+              poster={heroSlides[currentSlide]?.image}
+            >
+              <source src={settings.HOMEPAGE_HERO_BG_VIDEO || "/Homepage.mp4"} type="video/mp4" />
+              <source src="/homepage.mp4" type="video/mp4" />
+            </video>
+            {/* Cinematic Gradient & Vignette Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-b from-[#071325]/90 via-[#0a1e3f]/75 to-[#071325]/95" />
+          </div>
 
           {/* FLOATING OVERLAY HEADER (NO BACKGROUND STRIP AT ALL) */}
           <header className="relative z-30 bg-transparent py-4 px-4 md:px-8">
