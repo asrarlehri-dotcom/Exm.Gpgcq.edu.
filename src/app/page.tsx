@@ -431,7 +431,7 @@ export default function Home() {
       ───────────────────────────────────────────── */}
       {showHero && (
         <section className="relative bg-[#071325] text-white min-h-[580px] md:min-h-[640px] flex flex-col justify-between overflow-hidden">
-          {/* Background Video with Cinematic Overlay */}
+          {/* 100% Clean Background Video (No Dark Masking Overlay) */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
             <video
               ref={videoRef}
@@ -440,7 +440,7 @@ export default function Home() {
               muted
               playsInline
               preload="auto"
-              className="w-full h-full object-cover object-center scale-105"
+              className="w-full h-full object-cover object-center scale-100"
             >
               <source src="/homepage.mp4" type="video/mp4" />
               <source src="/Homepage.mp4" type="video/mp4" />
@@ -448,8 +448,6 @@ export default function Home() {
                 <source src={settings.HOMEPAGE_HERO_BG_VIDEO} type="video/mp4" />
               )}
             </video>
-            {/* Cinematic Gradient & Vignette Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-b from-[#071325]/90 via-[#0a1e3f]/75 to-[#071325]/95" />
           </div>
 
           {/* FLOATING OVERLAY HEADER (NO BACKGROUND STRIP AT ALL) */}
@@ -462,7 +460,7 @@ export default function Home() {
                     <img
                       src={logoImage}
                       alt="College Logo"
-                      className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-lg transition-transform group-hover:scale-105"
+                      className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] transition-transform group-hover:scale-105"
                     />
                   ) : (
                     <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600 to-amber-600 flex items-center justify-center text-white font-black text-xl shadow-lg">
@@ -472,10 +470,10 @@ export default function Home() {
                 </Link>
 
                 <div>
-                  <h1 className="font-black text-xl md:text-2xl lg:text-3xl text-white tracking-tight leading-none uppercase drop-shadow">
+                  <h1 className="font-black text-xl md:text-2xl lg:text-3xl text-white tracking-tight leading-none uppercase drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)]">
                     GOVT. BOYS POSTGRADUATE COLLEGE
                   </h1>
-                  <p className="text-xs md:text-sm font-semibold text-amber-300 mt-1 tracking-wide uppercase drop-shadow-sm">
+                  <p className="text-xs md:text-sm font-bold text-amber-300 mt-1 tracking-wide uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
                     Sariab Road, Quetta, Balochistan • Affiliated Institution & CMS Portal
                   </p>
                 </div>
@@ -485,7 +483,7 @@ export default function Home() {
               <nav className="hidden lg:flex items-center space-x-6 text-sm font-extrabold text-white">
                 {/* About Dropdown */}
                 <div className="relative group">
-                  <button className="flex items-center gap-1 hover:text-amber-400 py-2 transition-colors">
+                  <button className="flex items-center gap-1 hover:text-amber-400 py-2 transition-colors drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
                     <span>About</span>
                     <ChevronDown className="w-4 h-4 text-amber-400" />
                   </button>
@@ -504,7 +502,7 @@ export default function Home() {
 
                 {/* Students Dropdown */}
                 <div className="relative group">
-                  <button className="flex items-center gap-1 hover:text-amber-400 py-2 transition-colors">
+                  <button className="flex items-center gap-1 hover:text-amber-400 py-2 transition-colors drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
                     <span>Students</span>
                     <ChevronDown className="w-4 h-4 text-amber-400" />
                   </button>
@@ -529,7 +527,7 @@ export default function Home() {
 
                 {/* Faculty Dropdown */}
                 <div className="relative group">
-                  <button className="flex items-center gap-1 hover:text-amber-400 py-2 transition-colors">
+                  <button className="flex items-center gap-1 hover:text-amber-400 py-2 transition-colors drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
                     <span>Faculty</span>
                     <ChevronDown className="w-4 h-4 text-amber-400" />
                   </button>
@@ -548,7 +546,7 @@ export default function Home() {
 
                 {/* Offices Dropdown */}
                 <div className="relative group">
-                  <button className="flex items-center gap-1 hover:text-amber-400 py-2 transition-colors">
+                  <button className="flex items-center gap-1 hover:text-amber-400 py-2 transition-colors drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
                     <span>Offices</span>
                     <ChevronDown className="w-4 h-4 text-amber-400" />
                   </button>
@@ -567,7 +565,7 @@ export default function Home() {
 
                 {/* ORIC / Academics */}
                 <div className="relative group">
-                  <button className="flex items-center gap-1 hover:text-amber-400 py-2 transition-colors">
+                  <button className="flex items-center gap-1 hover:text-amber-400 py-2 transition-colors drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
                     <span>ORIC</span>
                     <ChevronDown className="w-4 h-4 text-amber-400" />
                   </button>
@@ -584,7 +582,7 @@ export default function Home() {
             </div>
 
             {/* FLOATING DEVELOPMENT NOTICE TICKER BAR (DIRECTLY UNDER LOGO/NAV ROW) */}
-            <div className="mt-3.5 bg-[#0A1E3F]/85 backdrop-blur-md border-y border-amber-500/40 py-2 px-4 shadow-md">
+            <div className="mt-3.5 bg-[#0A1E3F]/90 backdrop-blur-md border-y border-amber-500/40 py-2 px-4 shadow-[0_4px_15px_rgba(0,0,0,0.4)]">
               <div className="max-w-7xl mx-auto flex items-center gap-3">
                 <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-[10px] md:text-xs uppercase px-2.5 py-0.5 rounded shrink-0 tracking-wider flex items-center gap-1.5 shadow">
                   <Sparkles className="w-3.5 h-3.5" />
@@ -610,7 +608,7 @@ export default function Home() {
           {/* Left Arrow Button */}
           <button
             onClick={() => setCurrentSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length)}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/20 hover:bg-amber-500 hover:text-slate-950 backdrop-blur-md flex items-center justify-center transition-all text-white shadow-lg border border-white/20"
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-slate-950/40 hover:bg-amber-500 hover:text-slate-950 backdrop-blur-md flex items-center justify-center transition-all text-white shadow-[0_4px_15px_rgba(0,0,0,0.5)] border border-white/20"
             title="Previous Slide"
           >
             <ChevronLeft className="w-6 h-6" />
@@ -619,32 +617,32 @@ export default function Home() {
           {/* Right Arrow Button */}
           <button
             onClick={() => setCurrentSlide((prev) => (prev + 1) % heroSlides.length)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/20 hover:bg-amber-500 hover:text-slate-950 backdrop-blur-md flex items-center justify-center transition-all text-white shadow-lg border border-white/20"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-slate-950/40 hover:bg-amber-500 hover:text-slate-950 backdrop-blur-md flex items-center justify-center transition-all text-white shadow-[0_4px_15px_rgba(0,0,0,0.5)] border border-white/20"
             title="Next Slide"
           >
             <ChevronRight className="w-6 h-6" />
           </button>
 
-          {/* Hero Main Content */}
+          {/* Hero Main Floating Content */}
           <div className="max-w-5xl mx-auto px-6 text-center space-y-6 relative z-10 py-12">
-            <span className="inline-flex items-center gap-2 bg-amber-500/20 text-amber-300 border border-amber-400/40 text-[11px] md:text-xs font-extrabold uppercase px-4 py-1.5 rounded-full tracking-wider shadow-sm backdrop-blur-sm">
+            <span className="inline-flex items-center gap-2 bg-slate-950/60 text-amber-300 border border-amber-400/60 text-[11px] md:text-xs font-extrabold uppercase px-4 py-1.5 rounded-full tracking-wider shadow-[0_4px_20px_rgba(0,0,0,0.6)] backdrop-blur-md">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span>{heroSlides[currentSlide].badge}</span>
             </span>
 
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-black tracking-tight leading-tight text-white drop-shadow-lg max-w-4xl mx-auto">
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-black tracking-tight leading-tight text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.95)] max-w-4xl mx-auto">
               {heroSlides[currentSlide].title}
             </h2>
 
-            <p className="text-sm md:text-lg text-slate-200 font-medium max-w-2xl mx-auto leading-relaxed drop-shadow-md">
+            <p className="text-sm md:text-lg text-white font-bold max-w-2xl mx-auto leading-relaxed drop-shadow-[0_3px_14px_rgba(0,0,0,0.95)]">
               {heroSlides[currentSlide].subtitle}
             </p>
 
-            {/* CTA Buttons */}
+            {/* Floating Action Buttons */}
             <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
               <button
                 onClick={() => setChallanModalOpen(true)}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm md:text-base px-6 py-3.5 rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center gap-2"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm md:text-base px-6 py-3.5 rounded-xl shadow-[0_6px_25px_rgba(0,0,0,0.5)] transition-all transform hover:-translate-y-0.5 flex items-center gap-2 border border-emerald-400/40"
               >
                 <Receipt className="w-5 h-5" />
                 <span>Generate Fee Challan</span>
@@ -654,7 +652,7 @@ export default function Home() {
                 href="/login"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm md:text-base px-6 py-3.5 rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center gap-2"
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm md:text-base px-6 py-3.5 rounded-xl shadow-[0_6px_25px_rgba(0,0,0,0.5)] transition-all transform hover:-translate-y-0.5 flex items-center gap-2 border border-amber-300/50"
               >
                 <LogIn className="w-5 h-5" />
                 <span>Access CMS Dashboard</span>
@@ -664,7 +662,7 @@ export default function Home() {
                 href="/admission"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-slate-800/90 hover:bg-slate-700 text-white font-bold text-sm md:text-base px-6 py-3.5 rounded-xl border border-slate-600 transition-all transform hover:-translate-y-0.5 flex items-center gap-2"
+                className="bg-slate-950/80 hover:bg-slate-900 text-white font-bold text-sm md:text-base px-6 py-3.5 rounded-xl border border-white/40 shadow-[0_6px_25px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all transform hover:-translate-y-0.5 flex items-center gap-2"
               >
                 <GraduationCap className="w-5 h-5 text-amber-400" />
                 <span>Online Admission 2026</span>
